@@ -1,0 +1,20 @@
+# Environnements virtuels
+venv/
+.venv/
+env/
+
+# Cache Python
+__pycache__/
+*.pyc
+.mypy_cache/
+
+# Fichiers de rapport de test (Mocks)
+*report.json
+
+# IDE
+.vscode/
+.idea/
+
+# Fichiers temporaires ou générés
+dummy_metrics_log.txt
+*.jsonl

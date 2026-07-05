@@ -1,0 +1,30 @@
+# Analyse de code (partie "outils réels")
+# Pas de dépendances externes nécessaires (ast, os, subprocess sont dans la stdlib)
+
+# Génération du dataset (partie "dataset_generation")
+openai>=1.0.0              # API OpenAI (compatible OpenRouter)
+
+# Fine-tuning (partie "training")
+transformers>=4.47.0       # Hugging Face transformers
+trl>=0.12.0                # SFTTrainer
+peft>=0.13.0               # LoRA
+accelerate>=1.1.0          # Accélération distributed
+datasets>=2.18.0           # Dataset HF
+bitsandbytes>=0.43.0       # Optionnel (si tu veux quantifier)
+torch>=2.3.0               # PyTorch (doit être compatible ROCm)
+
+# Utilitaires
+python-dotenv>=1.0.0       # Variables d'environnement (.env)
+tqdm>=4.66.0               # Barres de progression
+tree-sitter 
+tree-sitter-javascript 
+tree-sitter-python
+# javaparser (ce paquet n'existe pas sur PyPI sous ce nom, il fait planter pip)
+tree-sitter-dart
+tree-sitter-go
+tree-sitter-typescript
+tree-sitter-rust
+tree-sitter-ruby
+tree-sitter-php
+tree-sitter-c-sharp
+tree-sitter-cpp
