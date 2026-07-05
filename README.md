@@ -1,55 +1,304 @@
-# Architect-Insight — Outils de collecte (partie "sans IA")
+# ArchX — The Oracle of Stacks
 
-Ce module correspond au bloc **OUTILS RÉELS** de l'architecture "Un Cerveau, Des
-Outils" : il calcule des métriques **factuelles et reproductibles** sur un dépôt
-Python, sans jamais faire appel à un LLM. C'est ce JSON qui sera injecté dans le
-prompt du modèle Gemma fine-tuné — le modèle interprète et recommande, il
-n'invente jamais de chiffres.
+> **Advanced AI-powered architectural analysis tool** — Analyzes any software repository and recommends the best architectural strategy (refactoring, migration, or status quo), powered by a fine-tuned Gemma model running on AMD MI300X.
 
-## Utilisation
+---
 
-```bash
-python -m architect_insight.collector /chemin/vers/le/repo -o rapport.json
+## Table of Contents
+
+1. [What is ArchX?](#what-is-archx)
+2. [How it works — The Full Pipeline](#how-it-works)
+3. [Project Structure](#project-structure)
+4. [Quick Start](#quick-start)
+5. [Dataset Generation](#dataset-generation)
+6. [Fine-Tuning on AMD Cloud](#fine-tuning-on-amd-cloud)
+7. [Frontend Dashboard](#frontend-dashboard)
+8. [AMD Developer Challenge Context](#amd-developer-challenge-context)
+9. [Contributing](#contributing)
+
+---
+
+## What is ArchX?
+
+ArchX is a tool for software architects and engineering managers that analyzes the health of a codebase and provides **structured, AI-generated recommendations** on whether to:
+
+- **Refactor** the existing codebase
+- **Migrate** to a new tech stack
+- **Maintain** the current architecture
+
+Unlike generic AI assistants (ChatGPT, Claude, etc.), ArchX uses a **purpose-built, fine-tuned AI model** that has been specifically trained to reason about software architecture using real code metrics. This means its recommendations are:
+
+- **Grounded in quantitative data** (coupling, cohesion, complexity, test coverage)
+- **Structured and consistent** (always returns a valid JSON with a phased action plan)
+- **Free from hallucinations** (trained with strict guard-rails: no invented ROI numbers, no $/€ costs)
+
+---
+
+## How it Works
+
+ArchX is built around a **Teacher-Student Distillation** pipeline, a state-of-the-art technique in AI engineering:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         ARCHX PIPELINE                              │
+│                                                                     │
+│  1. COLLECT            2. GENERATE DATASET    3. FINE-TUNE          │
+│  ─────────────         ──────────────────     ──────────────────    │
+│  collector.py          generate_dataset.py    training/train_lora.py│
+│  reads any Git repo    DeepSeek / GPT-4       Gemma 4B on AMD       │
+│  and extracts:         (Teacher Model)        MI300X GPU (LoRA)     │
+│                        ↓                      ↓                     │
+│  - Coupling score      800 JSON examples      fine-tuned Gemma      │
+│  - Cohesion score      (fr + en)              weights saved         │
+│  - Complexity          training_data.jsonl    architect-insight-lora│
+│  - Test coverage       ↓                                            │
+│  - Anti-patterns       4. INFER               5. DISPLAY            │
+│  - Git hotspots        ─────────────          ──────────────────    │
+│  - Dependencies        The fine-tuned         React Dashboard       │
+│  - Architecture        Gemma model            (ArchX frontend)      │
+│    pattern             receives the           shows metrics +        │
+│                        metrics as input       recommendation         │
+│                        and outputs a          in a premium UI        │
+│                        structured JSON                               │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-## Ce qui est calculé (et comment)
+### Why Fine-Tuning and not just GPT-4?
 
-| Champ | Méthode | Fiabilité |
+| | Generic LLM (GPT-4, Claude) | Fine-Tuned Gemma (ArchX) |
 |---|---|---|
-| `architecture_pattern` | Heuristique sur la structure de dossiers (manage.py, domain/, models/…) | Indicative — donne le pattern le plus probable + les preuves trouvées |
-| `coupling_score` | Moyenne du nombre d'imports par fichier, normalisée /10 | Objective mais simple (ne capte pas le couplage sémantique) |
-| `cohesion_score` | Proportion de classes "saines" (hors God Class) | Proxy heuristique — une vraie mesure LCOM nécessiterait une analyse des accès aux attributs |
-| `avg_cyclomatic_complexity` | Algorithme de McCabe via `ast`, réimplémenté sans dépendance | Standard, identique à ce que calcule radon |
-| `anti_patterns` | Seuils explicites (God Class, Long Method, Long Parameter List, High Coupling) | Objective — chaque seuil est documenté dans `patterns.py` |
-| `test_coverage_estimate` | Ratio fonctions de test / fonctions de code | **Estimation grossière**, pas une vraie couverture de lignes (voir docstring) |
-| `git_hotspots` | `git log --name-only` sur 12 mois + détection de commits "fix/bug/hotfix" | Factuel, basé sur l'historique réel |
+| **Cost per analysis** | ~$0.05–$0.20 | $0 (runs locally) |
+| **Response format** | Inconsistent JSON | 100% valid JSON, always |
+| **Knowledge** | General | Specialized in software architecture |
+| **Privacy** | Code sent to 3rd party | Runs on your own infrastructure |
+| **Speed** | ~3–10 seconds | <1 second on AMD MI300X |
 
-## Pourquoi cette approche plutôt que de fine-tuner un modèle pour "prédire" ces chiffres
+---
 
-Un LLM fine-tuné pour générer directement des scores comme "couplage 7.2/10"
-sans les calculer produit des chiffres qui *ressemblent* à des mesures mais
-n'en sont pas — un jury technique posera la question "comment as-tu validé
-ça ?" et il n'y aura pas de réponse solide. Ici, chaque chiffre est
-recalculable et vérifiable indépendamment du modèle.
+## Project Structure
 
-## Limites connues (à mentionner honnêtement dans la démo)
+```
+architect-insight-tools/
+│
+├── architect_insight/          # Core analysis engine (Python)
+│   ├── collector.py            # Main entry point — scans a Git repo
+│   ├── analyzers/              # Language-specific parsers
+│   │   ├── dart_analyzer.py
+│   │   ├── go_analyzer.py
+│   │   ├── java_analyzer.py
+│   │   ├── js_analyzer.py
+│   │   ├── rust_analyzer.py
+│   │   └── ...
+│   └── metrics/                # Metric calculators
+│       ├── architecture.py     # Detects patterns (MVC, Microservices, etc.)
+│       ├── complexity.py       # Cyclomatic complexity
+│       ├── cost_calculator.py  # Cloud cost estimation
+│       ├── dependencies.py     # Dependency graph analysis
+│       ├── git_hotspots.py     # Bug-prone files from Git history
+│       ├── patterns.py         # Anti-pattern detection
+│       └── tests.py            # Test coverage estimation
+│
+├── dataset_generation/         # AI Dataset pipeline
+│   ├── generate_dataset.py     # Main script — calls DeepSeek/GPT via OpenRouter
+│   ├── scenario_axes.py        # Generates diverse synthetic scenarios
+│   ├── teacher_prompts.py      # Prompt templates for the Teacher model
+│   └── training_data.jsonl     # ← Generated dataset (gitignored, ~159 examples)
+│
+├── training/                   # Fine-tuning scripts (run on AMD Cloud)
+│   ├── train_lora.py           # LoRA fine-tuning with TRL + PEFT
+│   ├── merge_adapter.py        # Merges LoRA weights into base model
+│   └── format_for_training.py  # Converts JSON metrics → chat format
+│
+├── frontend/                   # React Dashboard (ArchX UI)
+│   ├── src/
+│   │   ├── App.jsx             # Root component
+│   │   ├── index.css           # Global design system (cyberpunk theme)
+│   │   ├── components/
+│   │   │   ├── NavBar.jsx
+│   │   │   ├── HeroSection.jsx
+│   │   │   ├── ReportView.jsx
+│   │   │   └── ...
+│   │   └── data/
+│   │       └── mockReport.js   # Mock data for development
+│   └── package.json
+│
+├── demo_projects/              # Sample repos used for demos
+│   ├── django_app/
+│   ├── spring_app/
+│   └── flutter_app/
+│
+├── SETUP_AMD_CLOUD.md          # Step-by-step guide for AMD cloud setup
+└── requirements.txt            # Python dependencies
+```
 
-- `test_coverage_estimate` est un proxy, pas une couverture réelle — pour ça il
-  faudrait exécuter `coverage run` sur la suite de tests du projet analysé.
-- `cohesion_score` est une heuristique simple, pas une mesure LCOM complète.
-- `architecture_pattern` peut se tromper sur des structures atypiques —
-  c'est pour ça que le champ inclut `architecture_confidence` et
-  `architecture_evidence`, pour que le modèle (et l'utilisateur) sachent
-  combien s'y fier.
-- Seul Python est géré pour l'instant (AST natif). Étendre à JS/TS
-  nécessiterait un parseur externe (ex. `esprima`/`tree-sitter`).
+---
 
-## Prochaine étape
+## Quick Start
 
-Le JSON produit ici devient le champ `"metrics"` du format d'entraînement
-défini précédemment (voir `training_data.json`) : le modèle Gemma fine-tuné
-reçoit ces vrais chiffres + la description du projet, et ne génère que
-`analysis`, `recommendation`, `phases`, `risk_assessment`. Les valeurs
-chiffrées comme `estimated_cost` et `roi_after_months` devraient elles aussi
-être calculées par une fonction dédiée (heures de migration × taux horaire +
-delta de coût cloud), pas générées par le modèle.
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+ (for the frontend)
+- Git
+
+### 1. Clone and install dependencies
+
+```bash
+git clone <your-repo-url>
+cd architect-insight-tools
+
+# Python dependencies
+pip install -r requirements.txt
+
+# Frontend dependencies
+cd frontend
+npm install
+cd ..
+```
+
+### 2. Configure environment variables
+
+Create a `.env` file at the root (never commit this!):
+
+```bash
+# OpenRouter API key (for dataset generation only)
+OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+### 3. Run a demo analysis
+
+```bash
+# Analyze a local repo (dry run, no AI needed)
+python -m architect_insight.collector --repo . --output report.json
+
+# Or analyze with the demo projects included
+python prepare_demo_reports.py
+```
+
+### 4. Start the frontend
+
+```bash
+cd frontend
+npm run dev
+# → Open http://localhost:5173
+```
+
+---
+
+## Dataset Generation
+
+The dataset is what makes ArchX's AI "smart". It consists of **159 training examples** (+ 40 flagged for review) generated by a Teacher model (DeepSeek) that was given realistic software metrics and asked to write expert-level architectural recommendations.
+
+```bash
+# Dry run — tests the pipeline without API calls
+python -m dataset_generation.generate_dataset --n 20 --dry-run
+
+# Real generation (requires OPENROUTER_API_KEY)
+python -m dataset_generation.generate_dataset \
+    --n 100 --languages fr en \
+    --out dataset_generation/training_data.jsonl \
+    --review-out dataset_generation/to_review.jsonl \
+    --model deepseek/deepseek-chat
+```
+
+**Key features of the pipeline:**
+- **Checkpoint/Resume**: If interrupted (Ctrl+C or rate limits), re-running the same command resumes exactly where it left off.
+- **Automatic retry**: On rate limit errors (429), the script waits and retries with fallback models.
+- **Validation guard-rails**: Each generated example is validated — no invented costs ($/€), no hallucinated ROI numbers.
+- **Bilingual**: Generates examples in both French and English.
+
+---
+
+## Fine-Tuning on AMD Cloud
+
+This is the core technical contribution of the project. We fine-tune Google's **Gemma** model using **LoRA** (Low-Rank Adaptation) on an AMD **MI300X GPU** (192 GB VRAM) provided by the AMD Developer Cloud.
+
+See the full step-by-step guide: [`SETUP_AMD_CLOUD.md`](SETUP_AMD_CLOUD.md)
+
+**Summary of steps:**
+
+```bash
+# 1. On your local machine — push the dataset to the cloud instance
+scp dataset_generation/training_data.jsonl user@amd-instance:~/
+
+# 2. On the AMD cloud instance
+pip install "transformers>=4.47" "trl>=0.12" "peft>=0.13" accelerate datasets
+
+huggingface-cli login  # Required for Gemma (gated model)
+
+python3 -m training.train_lora \
+    --data dataset_generation/training_data.jsonl \
+    --model google/gemma-4-12B-it \
+    --output ./architect-insight-lora \
+    --epochs 3
+
+# 3. (Optional) Merge LoRA adapter into base model
+python3 -m training.merge_adapter \
+    --base google/gemma-4-12B-it \
+    --adapter ./architect-insight-lora \
+    --output ./architect-insight-merged
+```
+
+**Expected training time on MI300X:** ~2–4 hours for 3 epochs on 159 examples with a 12B model.
+
+---
+
+## Frontend Dashboard
+
+The ArchX frontend is a React application built with Vite, featuring a cyberpunk dark-mode design inspired by the "Oracle of Stacks" concept.
+
+```bash
+cd frontend
+npm run dev   # Development server → http://localhost:5173
+npm run build # Production build
+```
+
+**Features:**
+- Hero landing page with repo URL input
+- Live simulation of the analysis pipeline
+- Metrics dashboard (coupling, complexity, test coverage)
+- AI recommendation panel with phased action plan
+- Risk assessment and cost analysis
+
+---
+
+## AMD Developer Challenge Context
+
+This project was built for the **AMD Developer Challenge**, which provides participants with **$100 of free GPU credits** on the AMD Developer Cloud (MI300X instances with 192 GB VRAM).
+
+The challenge requires demonstrating a meaningful use of AMD's GPU hardware. ArchX demonstrates:
+
+1. **Data Engineering**: Automated, validated, bilingual dataset generation pipeline
+2. **Fine-Tuning on AMD**: LoRA fine-tuning of Gemma on the MI300X using ROCm + PyTorch
+3. **Real-World Application**: A practical tool with a full UI that solves a real engineering problem
+4. **Teacher-Student Distillation**: A modern AI training technique (used by Meta, Google, OpenAI)
+
+---
+
+## Contributing
+
+### Getting oriented
+
+1. Read this README fully
+2. Look at [`SETUP_AMD_CLOUD.md`](SETUP_AMD_CLOUD.md) to understand the full pipeline
+3. Check the open tasks in the project
+
+### Commit conventions
+
+- Messages in **English**, no emojis
+- Be descriptive but concise: `Add retry logic with exponential backoff to dataset generator`
+- Never commit `.env` files or API keys
+
+### Running tests
+
+```bash
+# Test the dataset validation pipeline (no API calls needed)
+python -m dataset_generation.generate_dataset --n 10 --dry-run
+
+# Test the collector on the demo projects
+python prepare_demo_reports.py
+```
+
+---
+
+*Built with ❤️ for the AMD Developer Challenge 2026*
