@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 JobStatus = Literal[
     "queued",
+    "cloning",
     "collecting",
     "building_prompt",
     "inferring",
@@ -18,7 +19,11 @@ JobStatus = Literal[
 
 
 class AnalyzeRequest(BaseModel):
-    repo: str = Field(..., min_length=1, description="Demo slug, relative or absolute repo path")
+    repo: str = Field(
+        ...,
+        min_length=1,
+        description="GitHub URL, demo slug, or relative/absolute local repo path",
+    )
     language: Literal["fr", "en"] = "fr"
     team_size: int = Field(default=8, ge=1, le=100)
     hourly_rate: float = Field(default=80.0, ge=0)

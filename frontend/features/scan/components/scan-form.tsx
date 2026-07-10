@@ -1,16 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
-import { startAnalysis } from "@/features/scan/api/analyze";
+import { getDemoProjects, startAnalysis } from "@/features/scan/api/analyze";
 import { ApiError } from "@/shared/api/client";
+import type { DemoProject } from "@/shared/types/job";
 
 export function ScanForm() {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoProjects, setDemoProjects] = useState<DemoProject[]>([]);
+
+  useEffect(() => {
+    getDemoProjects()
+      .then(setDemoProjects)
+      .catch(() => setDemoProjects([]));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +40,11 @@ export function ScanForm() {
       setError(message);
       setScanning(false);
     }
+  };
+
+  const selectDemo = (slug: string) => {
+    setUrl(slug);
+    setError(null);
   };
 
   return (
@@ -82,7 +95,7 @@ export function ScanForm() {
               <input
                 className="cyber-input py-4"
                 type="text"
-                placeholder="django_app or demo_projects/django_app"
+                placeholder="https://github.com/org/repo or django_app"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 disabled={scanning}
@@ -98,6 +111,23 @@ export function ScanForm() {
             </button>
           </div>
         </div>
+
+        {demoProjects.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="label-sm text-muted mr-1 self-center">Demo:</span>
+            {demoProjects.map((project) => (
+              <button
+                key={project.slug}
+                type="button"
+                onClick={() => selectDemo(project.slug)}
+                className="rounded border border-white/10 px-3 py-1 font-mono text-xs text-white/50 transition-colors hover:border-neon-cyan hover:text-neon-cyan"
+              >
+                {project.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {error && (
           <p className="mt-3 font-mono text-xs text-magenta">{error}</p>
         )}
@@ -105,9 +135,9 @@ export function ScanForm() {
 
       <div className="flex items-center gap-8 pt-2">
         {[
-          { value: "12.4K", label: "Repos Analyzed" },
-          { value: "98.7%", label: "Accuracy Score", color: "var(--neon-cyan)" },
-          { value: "4.2s", label: "Avg Scan Time" },
+          { value: "3", label: "Demo Projects" },
+          { value: "Real", label: "Collector Metrics", color: "var(--neon-cyan)" },
+          { value: "AI", label: "Gemma Powered", color: "var(--neon-magenta)" },
         ].map((stat, i) => (
           <div key={stat.label} className="flex items-center gap-8">
             {i > 0 && <div className="h-10 w-px bg-white/10" />}

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from api.config import PROJECT_ROOT, settings
+from api.services.github_cloner import is_github_url
 
 DEMO_PROJECTS: dict[str, str] = {
     "django_app": "Django App",
@@ -28,6 +29,9 @@ def list_demo_projects() -> list[dict[str, str]]:
 
 def resolve_repo_path(repo: str) -> Path:
     repo = repo.strip()
+
+    if is_github_url(repo):
+        raise ValueError("GitHub URLs are cloned at runtime; pass the URL directly to /api/analyze")
 
     if repo in DEMO_PROJECTS:
         resolved = settings.demo_projects_dir / repo

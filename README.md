@@ -194,7 +194,9 @@ npm run dev
 # → Open http://localhost:3000
 ```
 
-Enter a demo slug (e.g. `django_app`) in the scan form to run a real analysis.
+Enter a demo slug (e.g. `django_app`) or a public GitHub URL (e.g. `https://github.com/psf/requests`) in the scan form to run a real analysis.
+
+**GitHub clone flow:** public `github.com` repositories are shallow-cloned into `tmp/clones/{job_id}/`, analyzed, then deleted automatically (success or failure). Requires `git` in your PATH. Private repositories are not supported in v1.
 
 **Environment variables:**
 
@@ -202,6 +204,9 @@ Enter a demo slug (e.g. `django_app`) in the scan form to run a real analysis.
 |----------|----------|-------------|
 | `ARCHX_MODEL_PATH` | root `.env` | Path to fine-tuned Gemma model (optional) |
 | `ARCHX_MOCK_INFERENCE` | root `.env` | Force mock AI (`true`/`false`, optional) |
+| `ARCHX_CLONE_DIR` | root `.env` | Temp directory for GitHub clones (default: `tmp/clones/`) |
+| `ARCHX_CLONE_TIMEOUT` | root `.env` | Git clone timeout in seconds (default: `120`) |
+| `ARCHX_CLONE_DEPTH` | root `.env` | Shallow clone depth for git history (default: `500`) |
 | `NEXT_PUBLIC_API_URL` | `frontend/.env.local` | API base URL (default: `http://localhost:8000`) |
 
 ---
@@ -218,9 +223,15 @@ Enter a demo slug (e.g. `django_app`) in the scan form to run a real analysis.
 Example:
 
 ```bash
+# Demo project
 curl -X POST http://localhost:8000/api/analyze \
   -H "Content-Type: application/json" \
   -d '{"repo": "django_app", "language": "fr"}'
+
+# Public GitHub repository
+curl -X POST http://localhost:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repo": "https://github.com/psf/requests", "language": "fr"}'
 ```
 
 ---
