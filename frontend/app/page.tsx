@@ -1,7 +1,7 @@
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-2xl font-bold">ArchX</h1>
-    </main>
+    <div className="flex min-h-[calc(100vh-80px)] items-center justify-center px-6">
+      <p className="text-white/40">Loading scan feature...</p>
+    </div>
   );
 }
