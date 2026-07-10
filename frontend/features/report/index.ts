@@ -3,3 +3,7 @@ export { ReportPageClient } from "./components/report-page-client";
 export { MetricCard } from "./components/metric-card";
 export { ActionPlan } from "./components/action-plan";
 export { CostPanel } from "./components/cost-panel";
+export { AntiPatternsList } from "./components/anti-patterns-list";
+export { HotspotsTable } from "./components/hotspots-table";
+export { StackPanel } from "./components/stack-panel";
+export { SectionHeader } from "./components/section-header";

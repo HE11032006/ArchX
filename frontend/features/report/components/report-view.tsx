@@ -1,11 +1,14 @@
 import { Badge } from "@/shared/ui/badge";
-import { healthConfig } from "@/shared/data/mockReport";
-import type { HealthBand } from "@/shared/types/report";
-import type { Report } from "@/shared/types/report";
+import { getHealthDisplay } from "@/shared/lib/health-score";
+import type { HealthBand, Report } from "@/shared/types/report";
 
 import { ActionPlan } from "./action-plan";
+import { AntiPatternsList } from "./anti-patterns-list";
 import { CostPanel } from "./cost-panel";
+import { HotspotsTable } from "./hotspots-table";
 import { MetricCard } from "./metric-card";
+import { SectionHeader } from "./section-header";
+import { StackPanel } from "./stack-panel";
 
 const recommendationLabels = {
   refactoring: { label: "Refactoring", color: "var(--neon-cyan)" },
@@ -20,13 +23,14 @@ interface ReportViewProps {
 
 export function ReportView({ report, repoUrl }: ReportViewProps) {
   const { metrics, recommendation, cost_analysis, health_band } = report;
-  const health = healthConfig[health_band as HealthBand] ?? healthConfig.warning;
+  const health = getHealthDisplay(health_band as HealthBand, metrics);
   const rec =
     recommendationLabels[recommendation.recommendation] ??
     recommendationLabels.refactoring;
 
   return (
     <section className="mx-auto w-full max-w-6xl px-8 py-8">
+      {/* Header */}
       <div className="mb-10">
         <div className="status-badge mb-4 w-fit">
           <span className="label-sm text-cyan">Analysis Complete</span>
@@ -38,8 +42,12 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
         <p className="font-mono text-sm text-white/40">
           {repoUrl ?? report.repo}
         </p>
+        {report.date && (
+          <p className="mt-1 font-mono text-xs text-white/25">{report.date}</p>
+        )}
       </div>
 
+      {/* Health + Recommendation */}
       <div className="mb-8 grid gap-6 md:grid-cols-2">
         <div className="neon-card p-6">
           <span className="label-sm text-muted mb-3 block">Project Health</span>
@@ -49,7 +57,11 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
             </span>
             <span className="text-white/35">/10</span>
           </div>
-          <Badge variant="outline" className="mt-2 border-current" style={{ color: health.color }}>
+          <Badge
+            variant="outline"
+            className="mt-2 border-current capitalize"
+            style={{ color: health.color }}
+          >
             {health.label}
           </Badge>
         </div>
@@ -68,9 +80,18 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
         </div>
       </div>
 
-      <h2 className="label-sm text-cyan mb-4">Code Metrics</h2>
+      {/* Core metrics */}
+      <SectionHeader title="Code Metrics" />
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard label="Architecture" value={metrics.architecture_pattern} />
+        <MetricCard
+          label="Architecture"
+          value={metrics.architecture_pattern}
+        />
+        <MetricCard
+          label="Confidence"
+          value={metrics.architecture_confidence}
+          color="var(--neon-cyan)"
+        />
         <MetricCard
           label="Coupling"
           value={metrics.coupling_score}
@@ -90,19 +111,55 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
           color="var(--neon-magenta)"
         />
         <MetricCard label="Files Analyzed" value={metrics.files_analyzed} />
+        {metrics.total_functions != null && (
+          <MetricCard label="Functions" value={metrics.total_functions} />
+        )}
+        {metrics.num_hotspots != null && (
+          <MetricCard
+            label="Git Hotspots"
+            value={metrics.num_hotspots}
+            color="var(--neon-magenta)"
+          />
+        )}
       </div>
 
+      {/* Stack details */}
+      <SectionHeader title="Stack & Infrastructure" accent="muted" />
+      <div className="mb-8">
+        <StackPanel metrics={metrics} />
+      </div>
+
+      {/* Anti-patterns */}
+      {metrics.anti_patterns.length > 0 && (
+        <div className="mb-8">
+          <SectionHeader title="Anti-patterns" accent="magenta" />
+          <AntiPatternsList patterns={metrics.anti_patterns} />
+        </div>
+      )}
+
+      {/* Hotspots */}
+      <div className="mb-8">
+        <SectionHeader title="Risk Hotspots" />
+        <HotspotsTable
+          complexityHotspots={metrics.complexity_hotspots ?? []}
+          gitHotspots={metrics.git_hotspots}
+        />
+      </div>
+
+      {/* AI Analysis */}
       <div className="neon-card mb-8 p-6">
-        <h2 className="label-sm text-magenta mb-3">Analysis</h2>
+        <SectionHeader title="AI Analysis" accent="magenta" />
         <p className="leading-relaxed text-white/60">{recommendation.analysis}</p>
       </div>
 
+      {/* Action plan */}
       <ActionPlan phases={recommendation.phases} />
 
+      {/* Cost + Risk */}
       <div className="grid gap-6 md:grid-cols-2">
         <CostPanel costAnalysis={cost_analysis} />
         <div className="neon-card p-6">
-          <h2 className="label-sm text-muted mb-4">Risk Assessment</h2>
+          <SectionHeader title="Risk Assessment" accent="muted" />
           <p className="leading-relaxed text-white/60">
             {recommendation.risk_assessment}
           </p>
