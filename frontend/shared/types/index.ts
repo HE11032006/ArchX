@@ -1,1 +1,2 @@
-export * from "@/shared/types/report";
+export * from "./report";
+export * from "./job";
