@@ -109,17 +109,17 @@ architect-insight-tools/
 │   ├── merge_adapter.py        # Merges LoRA weights into base model
 │   └── format_for_training.py  # Converts JSON metrics → chat format
 │
-├── frontend/                   # React Dashboard (ArchX UI)
-│   ├── src/
-│   │   ├── App.jsx             # Root component
-│   │   ├── index.css           # Global design system (cyberpunk theme)
-│   │   ├── components/
-│   │   │   ├── NavBar.jsx
-│   │   │   ├── HeroSection.jsx
-│   │   │   ├── ReportView.jsx
-│   │   │   └── ...
-│   │   └── data/
-│   │       └── mockReport.js   # Mock data for development
+├── frontend/                   # Next.js Dashboard (feature-based architecture)
+│   ├── app/                    # App Router pages
+│   │   ├── page.tsx            # Landing / scan
+│   │   └── report/[jobId]/     # Architecture report
+│   ├── features/
+│   │   ├── scan/               # Scan form and preview
+│   │   └── report/             # Report components
+│   ├── shared/
+│   │   ├── ui/                 # shadcn/ui components
+│   │   ├── types/              # TypeScript domain types
+│   │   └── data/               # Mock data for development
 │   └── package.json
 │
 ├── demo_projects/              # Sample repos used for demos
@@ -179,8 +179,9 @@ python prepare_demo_reports.py
 
 ```bash
 cd frontend
+npm install
 npm run dev
-# → Open http://localhost:5173
+# → Open http://localhost:3000
 ```
 
 ---
@@ -245,11 +246,12 @@ python3 -m training.merge_adapter \
 
 ## Frontend Dashboard
 
-The ArchX frontend is a React application built with Vite, featuring a cyberpunk dark-mode design inspired by the "Oracle of Stacks" concept.
+The ArchX frontend is a **Next.js** application (App Router, TypeScript) with a **feature-based architecture**, Tailwind CSS, and shadcn/ui. It features a cyberpunk dark-mode design inspired by the "Oracle of Stacks" concept.
 
 ```bash
 cd frontend
-npm run dev   # Development server → http://localhost:5173
+npm install
+npm run dev   # Development server → http://localhost:3000
 npm run build # Production build
 ```
 
