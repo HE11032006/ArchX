@@ -3,21 +3,35 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { startAnalysis } from "@/features/scan/api/analyze";
+import { ApiError } from "@/shared/api/client";
+
 export function ScanForm() {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
 
     setScanning(true);
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      const { job_id } = await startAnalysis({ repo: url.trim(), language: "fr" });
+      router.push(`/report/${job_id}`);
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to start analysis";
+      setError(message);
       setScanning(false);
-      const encoded = encodeURIComponent(url.trim());
-      router.push(`/report/demo?repo=${encoded}`);
-    }, 1500);
+    }
   };
 
   return (
@@ -38,9 +52,7 @@ export function ScanForm() {
         <span style={{ color: "var(--neon-magenta)" }}>STACK.</span>
       </h1>
 
-      <p
-        className="max-w-lg border-l border-white/20 pl-6 text-[1.1rem] leading-relaxed font-light text-white/55"
-      >
+      <p className="max-w-lg border-l border-white/20 pl-6 text-[1.1rem] leading-relaxed font-light text-white/55">
         Intelligence artificielle avancée pour l&apos;analyse de dette technique, les chemins
         de migration et l&apos;architecture logicielle prédictive — propulsée par Gemma fine-tuné
         sur AMD MI300X.
@@ -70,9 +82,10 @@ export function ScanForm() {
               <input
                 className="cyber-input py-4"
                 type="text"
-                placeholder="github.com/org/repository"
+                placeholder="django_app or demo_projects/django_app"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
+                disabled={scanning}
               />
             </div>
             <button
@@ -85,6 +98,9 @@ export function ScanForm() {
             </button>
           </div>
         </div>
+        {error && (
+          <p className="mt-3 font-mono text-xs text-magenta">{error}</p>
+        )}
       </form>
 
       <div className="flex items-center gap-8 pt-2">
@@ -96,10 +112,7 @@ export function ScanForm() {
           <div key={stat.label} className="flex items-center gap-8">
             {i > 0 && <div className="h-10 w-px bg-white/10" />}
             <div>
-              <div
-                className="clash-bold text-2xl"
-                style={{ color: stat.color ?? "#fff" }}
-              >
+              <div className="clash-bold text-2xl" style={{ color: stat.color ?? "#fff" }}>
                 {stat.value}
               </div>
               <div className="label-sm text-muted">{stat.label}</div>
