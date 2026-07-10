@@ -1,12 +1,10 @@
-import { ReportView } from "@/features/report";
-import { mockReport } from "@/shared/data/mockReport";
+import { ReportPageClient } from "@/features/report/components/report-page-client";
 
 interface ReportPageProps {
-  searchParams: Promise<{ repo?: string }>;
+  params: Promise<{ jobId: string }>;
 }
 
-export default async function ReportPage({ searchParams }: ReportPageProps) {
-  const { repo } = await searchParams;
-
-  return <ReportView report={mockReport} repoUrl={repo} />;
+export default async function ReportPage({ params }: ReportPageProps) {
+  const { jobId } = await params;
+  return <ReportPageClient jobId={jobId} />;
 }

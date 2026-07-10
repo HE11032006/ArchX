@@ -1,5 +1,6 @@
 import { Badge } from "@/shared/ui/badge";
 import { healthConfig } from "@/shared/data/mockReport";
+import type { HealthBand } from "@/shared/types/report";
 import type { Report } from "@/shared/types/report";
 
 import { ActionPlan } from "./action-plan";
@@ -19,7 +20,7 @@ interface ReportViewProps {
 
 export function ReportView({ report, repoUrl }: ReportViewProps) {
   const { metrics, recommendation, cost_analysis, health_band } = report;
-  const health = healthConfig[health_band] ?? healthConfig.warning;
+  const health = healthConfig[health_band as HealthBand] ?? healthConfig.warning;
   const rec =
     recommendationLabels[recommendation.recommendation] ??
     recommendationLabels.refactoring;
