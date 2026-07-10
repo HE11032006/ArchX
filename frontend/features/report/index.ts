@@ -1,2 +1,4 @@
-// Public API for the report feature.
-// Components are exported from this barrel in later commits.
+export { ReportView } from "./components/report-view";
+export { MetricCard } from "./components/metric-card";
+export { ActionPlan } from "./components/action-plan";
+export { CostPanel } from "./components/cost-panel";
