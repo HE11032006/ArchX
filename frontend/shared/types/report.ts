@@ -8,6 +8,13 @@ export interface ComplexityHotspot {
   num_functions: number;
 }
 
+export interface GitHotspot {
+  file: string;
+  total_changes_12mo: number;
+  bugfix_changes_12mo: number;
+  bugfix_ratio: number;
+}
+
 export interface Phase {
   phase: number;
   action: string;
@@ -18,17 +25,24 @@ export interface Phase {
 export interface Metrics {
   architecture_pattern: string;
   architecture_confidence: string;
+  architecture_evidence?: string[];
   coupling_score: number;
   cohesion_score: number;
   avg_cyclomatic_complexity: number;
   test_coverage_estimate: number;
   top_hotspot_bugfix_ratio: number;
+  num_hotspots?: number;
   files_analyzed: number;
+  total_functions?: number;
+  total_classes?: number;
   anti_patterns: string[];
   complexity_hotspots: ComplexityHotspot[];
+  git_hotspots?: GitHotspot[];
   dependencies: {
     total_dependencies: number;
     total_obsolete: number;
+    has_dependency_files?: boolean;
+    languages?: Record<string, { count: number; obsolete_count: number }>;
   };
   database: {
     detected_databases: string[];

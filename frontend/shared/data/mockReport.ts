@@ -18,6 +18,11 @@ export const mockReport: Report = {
       { file: "api/serializers.py", max_complexity: 11, num_functions: 8 },
       { file: "users/models.py", max_complexity: 9, num_functions: 6 },
     ],
+    git_hotspots: [
+      { file: "core/views.py", total_changes_12mo: 42, bugfix_changes_12mo: 8, bugfix_ratio: 0.19 },
+      { file: "core/models.py", total_changes_12mo: 28, bugfix_changes_12mo: 3, bugfix_ratio: 0.11 },
+    ],
+    num_hotspots: 2,
     dependencies: {
       total_dependencies: 24,
       total_obsolete: 5,
