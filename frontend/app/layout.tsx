@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 
-import { AppShell } from "@/shared/components/app-shell";
+import { AppShellProvider } from "@/shared/components/app-shell-provider";
 import { cn } from "@/shared/lib/utils";
 
 import "./globals.css";
@@ -24,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={cn(spaceGrotesk.variable, "font-sans antialiased")}>
-        <AppShell>{children}</AppShell>
+        <AppShellProvider>{children}</AppShellProvider>
       </body>
     </html>
   );
