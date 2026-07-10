@@ -16,6 +16,21 @@ class Settings(BaseSettings):
     archx_mock_inference: bool | None = None
     cors_origins: list[str] = ["http://localhost:3000"]
     demo_projects_dir: Path = PROJECT_ROOT / "demo_projects"
+    archx_clone_dir: Path = PROJECT_ROOT / "tmp" / "clones"
+    archx_clone_timeout: int = 120
+    archx_clone_depth: int = 500
+
+    @property
+    def clone_dir(self) -> Path:
+        return self.archx_clone_dir
+
+    @property
+    def clone_timeout(self) -> int:
+        return self.archx_clone_timeout
+
+    @property
+    def clone_depth(self) -> int:
+        return self.archx_clone_depth
 
     @property
     def use_mock_inference(self) -> bool:

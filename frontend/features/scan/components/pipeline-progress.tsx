@@ -1,6 +1,7 @@
 import type { JobStatus } from "@/shared/types/job";
 
 const STEPS: { step: number; label: string; status: JobStatus }[] = [
+  { step: 0, label: "Cloning repository", status: "cloning" },
   { step: 1, label: "Collecting metrics", status: "collecting" },
   { step: 2, label: "Building prompt", status: "building_prompt" },
   { step: 3, label: "Generating recommendation", status: "inferring" },
@@ -37,7 +38,7 @@ export function PipelineProgress({ currentStep, stepLabel, status }: PipelinePro
         <div className="flex flex-col gap-4">
           {STEPS.map((step) => {
             const done = !isFailed && currentStep > step.step;
-            const active = !isFailed && currentStep === step.step;
+            const active = !isFailed && status === step.status;
             const pending = !done && !active;
 
             return (
@@ -54,7 +55,7 @@ export function PipelineProgress({ currentStep, stepLabel, status }: PipelinePro
                     border: active ? "1px solid var(--neon-cyan)" : "1px solid transparent",
                   }}
                 >
-                  {done ? "✓" : step.step}
+                  {done ? "✓" : step.step === 0 ? "↓" : step.step}
                 </div>
                 <div className="flex-1">
                   <p

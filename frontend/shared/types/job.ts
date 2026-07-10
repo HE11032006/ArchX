@@ -2,6 +2,7 @@ import type { Report } from "./report";
 
 export type JobStatus =
   | "queued"
+  | "cloning"
   | "collecting"
   | "building_prompt"
   | "inferring"

@@ -15,6 +15,7 @@ __pycache__/
 # Fichiers temporaires ou générés
 dummy_metrics_log.txt
 *.jsonl
+tmp/clones/
 
 # Secrets — ne JAMAIS commiter
 .env
