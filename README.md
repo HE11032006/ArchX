@@ -109,6 +109,11 @@ architect-insight-tools/
 │   ├── merge_adapter.py        # Merges LoRA weights into base model
 │   └── format_for_training.py  # Converts JSON metrics → chat format
 │
+├── api/                        # FastAPI backend
+│   ├── main.py                 # App entry point
+│   ├── routes/                 # analyze, jobs, demo-projects, health
+│   └── services/               # pipeline, job_store, health
+│
 ├── frontend/                   # Next.js Dashboard (feature-based architecture)
 │   ├── app/                    # App Router pages
 │   │   ├── page.tsx            # Landing / scan
@@ -165,23 +170,57 @@ Create a `.env` file at the root (never commit this!):
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-### 3. Run a demo analysis
+### 3. Run a demo analysis (CLI)
 
 ```bash
-# Analyze a local repo (dry run, no AI needed)
-python -m architect_insight.collector --repo . --output report.json
+# Analyze a demo project via CLI
+python demo.py --repo demo_projects/django_app --mock
 
-# Or analyze with the demo projects included
-python prepare_demo_reports.py
+# Or collect metrics only (no AI)
+python -m architect_insight.collector demo_projects/django_app -o report.json
 ```
 
-### 4. Start the frontend
+### 4. Start the API and frontend
 
 ```bash
+# Terminal 1 — FastAPI backend
+uvicorn api.main:app --reload --port 8000
+
+# Terminal 2 — Next.js frontend
 cd frontend
+cp .env.local.example .env.local   # optional, defaults to localhost:8000
 npm install
 npm run dev
 # → Open http://localhost:3000
+```
+
+Enter a demo slug (e.g. `django_app`) in the scan form to run a real analysis.
+
+**Environment variables:**
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `ARCHX_MODEL_PATH` | root `.env` | Path to fine-tuned Gemma model (optional) |
+| `ARCHX_MOCK_INFERENCE` | root `.env` | Force mock AI (`true`/`false`, optional) |
+| `NEXT_PUBLIC_API_URL` | `frontend/.env.local` | API base URL (default: `http://localhost:8000`) |
+
+---
+
+## API Endpoints
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/health` | Healthcheck |
+| `GET` | `/api/demo-projects` | List available demo repositories |
+| `POST` | `/api/analyze` | Start an analysis job |
+| `GET` | `/api/jobs/{job_id}` | Poll job status and retrieve report |
+
+Example:
+
+```bash
+curl -X POST http://localhost:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repo": "django_app", "language": "fr"}'
 ```
 
 ---
