@@ -1,0 +1,101 @@
+{
+  "version": "1.0",
+  "date": "2026-07-06",
+  "repo": "demo_projects/flutter_app",
+  "metrics": {
+    "repo_path": "C:\\Users\\EULOGE\\Downloads\\architect-insight-tools\\demo_projects\\flutter_app",
+    "files_analyzed": 0,
+    "files_with_errors": 0,
+    "total_functions": 0,
+    "total_classes": 0,
+    "architecture_pattern": "Non déterminé (structure ad-hoc / script unique)",
+    "architecture_confidence": "low",
+    "architecture_evidence": [],
+    "coupling_score": 0.0,
+    "cohesion_score": 5.0,
+    "avg_cyclomatic_complexity": 0.0,
+    "test_coverage_estimate": 0.0,
+    "anti_patterns": [],
+    "complexity_hotspots": [],
+    "git_hotspots": [],
+    "top_hotspot_bugfix_ratio": 0.0,
+    "num_hotspots": 0,
+    "dependencies": {
+      "total_dependencies": 0,
+      "total_obsolete": 0,
+      "languages": {
+        "Dart/Flutter": {
+          "manifest_file": "pubspec.yaml",
+          "count": 0,
+          "obsolete_count": 0,
+          "dependencies": [],
+          "dev_dependencies": []
+        }
+      },
+      "has_dependency_files": true
+    },
+    "database": {
+      "detected_databases": [
+        "Non détecté"
+      ],
+      "detected_orms": [
+        "Non détecté"
+      ],
+      "migration_count": 0,
+      "complexity": "very_low",
+      "config_files": [],
+      "has_database": false
+    },
+    "tests": {
+      "total_test_files": 1,
+      "total_test_functions": 0,
+      "test_ratio": 50.0,
+      "coverage_estimate": "high",
+      "frameworks": [
+        "Non détecté"
+      ],
+      "test_types": {
+        "unit": 1,
+        "integration": 0,
+        "e2e": 0,
+        "widget": 0,
+        "other": 1
+      },
+      "top_test_files": [
+        "pubspec.yaml"
+      ]
+    },
+    "performance": {
+      "endpoints_count": 0,
+      "endpoints": [],
+      "external_calls_detected": 0,
+      "cached_operations_detected": 0,
+      "async_operations_detected": 0,
+      "potential_n_plus_1_hotspots": 0,
+      "performance_score": "medium",
+      "has_async": false,
+      "has_cache": false
+    },
+    "js_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_classes": 0,
+      "has_js_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "java_analysis": {
+      "files_analyzed": 0,
+      "total_methods": 0,
+      "total_classes": 0,
+      "has_java_analysis": false,
+      "file_errors": 0
+    },
+    "dart_analysis": {
+      "files_analyzed": 2,
+      "total_functions": 0,
+      "total_classes": 0,
+      "has_dart_analysis": false,
+      "file_errors": 2,
+      "files": [
+        

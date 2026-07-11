@@ -1,0 +1,192 @@
+{
+  "version": "1.0",
+  "date": "2026-07-06",
+  "repo": "demo_projects/springboot_app",
+  "metrics": {
+    "repo_path": "C:\\Users\\EULOGE\\Downloads\\architect-insight-tools\\demo_projects\\springboot_app",
+    "files_analyzed": 0,
+    "files_with_errors": 0,
+    "total_functions": 0,
+    "total_classes": 0,
+    "architecture_pattern": "Non déterminé (structure ad-hoc / script unique)",
+    "architecture_confidence": "low",
+    "architecture_evidence": [],
+    "coupling_score": 0.0,
+    "cohesion_score": 5.0,
+    "avg_cyclomatic_complexity": 0.0,
+    "test_coverage_estimate": 0.0,
+    "anti_patterns": [],
+    "complexity_hotspots": [],
+    "git_hotspots": [],
+    "top_hotspot_bugfix_ratio": 0.0,
+    "num_hotspots": 0,
+    "dependencies": {
+      "total_dependencies": 1,
+      "total_obsolete": 0,
+      "languages": {
+        "Java (Maven)": {
+          "manifest_file": "pom.xml",
+          "count": 1,
+          "obsolete_count": 0,
+          "dependencies": [
+            {
+              "name": "Voir le fichier manifeste pour les détails",
+              "version": null,
+              "is_obsolete": false,
+              "latest_known": null,
+              "type": "production"
+            }
+          ],
+          "dev_dependencies": []
+        }
+      },
+      "has_dependency_files": true
+    },
+    "database": {
+      "detected_databases": [
+        "Non détecté"
+      ],
+      "detected_orms": [
+        "Non détecté"
+      ],
+      "migration_count": 0,
+      "complexity": "very_low",
+      "config_files": [],
+      "has_database": false
+    },
+    "tests": {
+      "total_test_files": 0,
+      "total_test_functions": 0,
+      "test_ratio": 0.0,
+      "coverage_estimate": "very_low",
+      "frameworks": [
+        "Non détecté"
+      ],
+      "test_types": {
+        "unit": 0,
+        "integration": 0,
+        "e2e": 0,
+        "widget": 0,
+        "other": 0
+      },
+      "top_test_files": []
+    },
+    "performance": {
+      "endpoints_count": 0,
+      "endpoints": [],
+      "external_calls_detected": 0,
+      "cached_operations_detected": 0,
+      "async_operations_detected": 0,
+      "potential_n_plus_1_hotspots": 0,
+      "performance_score": "medium",
+      "has_async": false,
+      "has_cache": false
+    },
+    "js_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_classes": 0,
+      "has_js_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "java_analysis": {
+      "files_analyzed": 2,
+      "total_methods": 0,
+      "total_classes": 0,
+      "has_java_analysis": false,
+      "file_errors": 2
+    },
+    "dart_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_classes": 0,
+      "has_dart_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "go_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_structs": 0,
+      "has_go_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "rust_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_structs": 0,
+      "has_rust_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "ruby_analysis": {
+      "files_analyzed": 0,
+      "total_methods": 0,
+      "total_classes": 0,
+      "has_ruby_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "php_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_classes": 0,
+      "has_php_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "cs_analysis": {
+      "files_analyzed": 0,
+      "total_methods": 0,
+      "total_classes": 0,
+      "has_cs_analysis": false,
+      "file_errors": 0,
+      "files": []
+    },
+    "cpp_analysis": {
+      "files_analyzed": 0,
+      "total_functions": 0,
+      "total_classes": 0,
+      "has_cpp_analysis": false,
+      "file_errors": 0,
+      "files": []
+    }
+  },
+  "recommendation": {
+    "project_description": "Projet Django avec une dette technique modérée",
+    "analysis": "L'équipe est mixte (60% juniors). La codebase Django a 4 ans, 120k lignes.",
+    "recommendation": "refactoring",
+    "phases": [
+      {
+        "phase": 1,
+        "action": "Réduire la dette technique",
+        "duration_days": 10
+      },
+      {
+        "phase": 2,
+        "action": "Améliorer les tests",
+        "duration_days": 15
+      }
+    ],
+    "risk_assessment": "Modéré"
+  },
+  "cost_analysis": {
+    "migration_cost": 0.0,
+    "current_cloud_cost": 2000.0,
+    "target_cloud_cost": 2000.0,
+    "monthly_savings": 0.0,
+    "roi_months": Infinity,
+    "payback_months": Infinity,
+    "cost_confidence": "high"
+  },
+  "summary": {
+    "architecture": "Non déterminé (structure ad-hoc / script unique)",
+    "recommendation_type": "refactoring",
+    "migration_cost_euro": 0.0,
+    "monthly_savings_euro": 0.0,
+    "roi_months": Infinity,
+    "risk": "Modéré"
+  }
+}
