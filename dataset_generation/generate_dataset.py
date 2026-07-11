@@ -123,52 +123,85 @@ def validate_output(raw_text: str, scenario: Scenario) -> tuple[dict | None, Val
 
 
 def call_teacher_model(system: str, user: str, model: str = "google/gemma-2-9b-it:free") -> str:
-    """Appelle l'API OpenRouter avec retry automatique sur 429. Lit la clé depuis .env."""
-    api_key = (
-        os.environ.get("OPENROUTER_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-    )
-    if not api_key:
-        raise ValueError("Aucune clé API trouvée. Définissez OPENROUTER_API_KEY ou OPENAI_API_KEY dans votre fichier .env")
+    """Appelle les fournisseurs IA disponibles avec fallback ordonné : Gemini -> Mistral -> OpenRouter."""
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    mistral_key = os.environ.get("MISTRAL_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")
 
-
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key
-    )
-
-
-    # Modèles de fallback GARANTIS gratuits (Mise à jour Juillet 2026)
-    fallback_models = [
-        model,
-        "google/gemma-4-31b-it:free",
-        "google/gemma-4-26b-a4b-it:free",
-        "openrouter/free"
-    ]
-
-
-    for attempt in range(5):
-        current_model = fallback_models[min(attempt, len(fallback_models) - 1)]
+    # Étape 1 : Tenter Gemini (Google AI Studio)
+    if gemini_key:
         try:
+            client = OpenAI(
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                api_key=gemini_key
+            )
             response = client.chat.completions.create(
-                model=current_model,
+                model="gemini-2.0-flash",
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user}
                 ]
             )
-            return response.choices[0].message.content
-        except (RateLimitError, APIConnectionError, APITimeoutError) as e:
-            wait = 10 * (attempt + 1)  # 10s, 20s, 30s, 40s, 50s
-            print(f"  [RATE LIMIT/ERREUR RÉSEAU] {current_model} — attente {wait}s avant retry {attempt+1}/5... (détail: {e})")
-            time.sleep(wait)
+            # Vérifier que le format de sortie est propre
+            content = response.choices[0].message.content
+            if content:
+                return content
         except Exception as e:
-            # Autre erreur inattendue : on loggue et on retry quand même
-            print(f"  [ERREUR INATTENDUE] {current_model} — {e}. Retry dans {10 * (attempt + 1)}s...")
-            time.sleep(10 * (attempt + 1))
+            print(f"  [GEMINI FAILS] Erreur lors de l'appel Gemini: {e}. Bascule sur Mistral...")
 
+    # Étape 2 : Tenter Mistral API
+    if mistral_key:
+        try:
+            client = OpenAI(
+                base_url="https://api.mistral.ai/v1",
+                api_key=mistral_key
+            )
+            response = client.chat.completions.create(
+                model="mistral-small-latest",
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user}
+                ]
+            )
+            content = response.choices[0].message.content
+            if content:
+                return content
+        except Exception as e:
+            print(f"  [MISTRAL FAILS] Erreur lors de l'appel Mistral: {e}. Bascule sur OpenRouter...")
 
-    raise RuntimeError(f"Échec après 5 tentatives pour le scénario (rate limit ou erreur API persistante)")
+    # Étape 3 : Fallback final OpenRouter (si clés disponibles)
+    if openrouter_key:
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=openrouter_key
+        )
+        fallback_models = [
+            model,
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
+            "openrouter/free"
+        ]
+        for attempt in range(5):
+            current_model = fallback_models[min(attempt, len(fallback_models) - 1)]
+            try:
+                response = client.chat.completions.create(
+                    model=current_model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user}
+                    ]
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                wait = 10 * (attempt + 1)
+                print(f"  [OPENROUTER RETRY] {current_model} échoué ({e}) — attente {wait}s...")
+                time.sleep(wait)
+
+    # Si rien n'a marché ou si aucune clé n'est définie
+    raise RuntimeError(
+        "Échec de tous les fournisseurs d'API (Gemini, Mistral et OpenRouter). "
+        "Veuillez définir au moins une clé API valide (GEMINI_API_KEY, MISTRAL_API_KEY ou OPENROUTER_API_KEY) dans votre .env"
+    )
 
 
 def generate_dataset(
