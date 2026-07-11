@@ -81,6 +81,29 @@ CASES.append((
     dict(ok=True, needs_review=False),
 ))
 
+# 7. project_description mentionne une stack différente de celle du scénario (Python/Django/
+#    PostgreSQL) -> flag pour relecture (root cause du bug de hallucination de stack)
+CASES.append((
+    "FLAG - project_description mentionne une stack étrangère au scénario",
+    make_scenario("moderate"),
+    '{"project_description": "Plateforme mature construite en .NET/ASP.NET Core avec SQL Server.", '
+    '"analysis": "...", "recommendation": "Refactoring ciblé.", '
+    '"phases": [{"phase": 1, "action": "...", "duration_days_range": "5-10 jours"}], '
+    '"risk_assessment": "Modéré"}',
+    dict(ok=True, needs_review=True),
+))
+
+# 8. project_description ne mentionne QUE la vraie stack du scénario -> pas de flag
+CASES.append((
+    "OK - project_description mentionne la vraie stack (Python/Django/PostgreSQL)",
+    make_scenario("moderate"),
+    '{"project_description": "Plateforme e-commerce en Python/Django avec PostgreSQL.", '
+    '"analysis": "...", "recommendation": "Refactoring ciblé.", '
+    '"phases": [{"phase": 1, "action": "...", "duration_days_range": "5-10 jours"}], '
+    '"risk_assessment": "Modéré"}',
+    dict(ok=True, needs_review=False),
+))
+
 passed, failed = 0, 0
 for name, scenario, raw, expected in CASES:
     data, result = validate_output(raw, scenario)

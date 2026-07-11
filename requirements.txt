@@ -17,6 +17,9 @@ torch>=2.3.0               # PyTorch (doit être compatible ROCm)
 python-dotenv>=1.0.0       # Variables d'environnement (.env)
 tqdm>=4.66.0               # Barres de progression
 
+# Tests
+pytest>=8.0.0
+
 # API
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0

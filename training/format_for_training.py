@@ -1,6 +1,19 @@
 SYSTEM_PROMPT = {
-    "fr": "Tu es un architecte logiciel senior expert en analyse de code et migration technologique. Tu dois répondre UNIQUEMENT en JSON valide avec la structure demandée.",
-    "en": "You are a senior software architect expert in code analysis and technology migration. You must respond ONLY with valid JSON using the requested structure."
+    "fr": (
+        "Tu es un architecte logiciel senior expert en analyse de code et migration technologique. "
+        "Tu dois répondre UNIQUEMENT en JSON valide avec la structure demandée. "
+        "N'affirme jamais une stack technique, un âge de projet, ou une composition d'équipe "
+        "(niveau d'expérience, ratio junior/senior) qui ne sont pas explicitement fournis dans le "
+        "contexte ci-dessous — reste sur les métriques et anti-patterns donnés, comme pour les "
+        "montants financiers que tu ne dois jamais inventer."
+    ),
+    "en": (
+        "You are a senior software architect expert in code analysis and technology migration. "
+        "You must respond ONLY with valid JSON using the requested structure. "
+        "Never assert a tech stack, project age, or team composition (experience level, "
+        "junior/senior ratio) that is not explicitly provided in the context below — stick to the "
+        "given metrics and anti-patterns, the same way you must never invent financial figures."
+    ),
 }
 
 def build_user_message(language: str, input_data: dict) -> str:
@@ -124,9 +137,11 @@ def build_user_message(language: str, input_data: dict) -> str:
         context = input_data.get("sector", input_data.get("repo_path", "projet non spécifié"))
         team = input_data.get("team_size")
         team_line = f"\n- Équipe : {team} développeurs" if team else ""
-        
+        stack_bits = [b for b in (input_data.get("language"), input_data.get("database_name")) if b]
+        stack_line = f"\n- Stack connue : {', '.join(stack_bits)}" if stack_bits else ""
+
         return (
-            f"CONTEXTE\n- {context}{team_line}\n\n"
+            f"CONTEXTE\n- {context}{team_line}{stack_line}\n\n"
             f"MÉTRIQUES CALCULÉES (Python)\n{metric_lines}\n\n"
             f"{multi_lang_section}"
             f"{js_section}"
@@ -248,9 +263,11 @@ def build_user_message(language: str, input_data: dict) -> str:
         context = input_data.get("sector", input_data.get("repo_path", "unspecified project"))
         team = input_data.get("team_size")
         team_line = f"\n- Team: {team} developers" if team else ""
-        
+        stack_bits = [b for b in (input_data.get("language"), input_data.get("database_name")) if b]
+        stack_line = f"\n- Known stack: {', '.join(stack_bits)}" if stack_bits else ""
+
         return (
-            f"CONTEXT\n- {context}{team_line}\n\n"
+            f"CONTEXT\n- {context}{team_line}{stack_line}\n\n"
             f"COMPUTED METRICS (Python)\n{metric_lines}\n\n"
             f"{multi_lang_section}"
             f"{js_section}"

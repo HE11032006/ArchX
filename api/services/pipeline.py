@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Callable
 from datetime import date
@@ -14,6 +15,8 @@ from training.format_for_training import SYSTEM_PROMPT, build_user_message
 
 from api.services.health import compute_health_band
 
+logger = logging.getLogger(__name__)
+
 ProgressCallback = Callable[[str, int], None]
 
 STEP_LABELS = {
@@ -23,6 +26,25 @@ STEP_LABELS = {
     4: "Computing costs",
     5: "Finalizing report",
 }
+
+
+def _detected_language(metrics: dict) -> str | None:
+    """Real signal only: manifest-detected languages (architect_insight.metrics.dependencies).
+
+    Deliberately does NOT guess a framework — nothing in the collector output
+    names one reliably, and asserting a wrong guess is worse than omitting it
+    (see the fine-tuned model's hallucination fix in training/format_for_training.py).
+    """
+    detected = metrics.get("dependencies", {}).get("languages", {})
+    return ", ".join(sorted(detected)) if detected else None
+
+
+def _detected_database(metrics: dict) -> str | None:
+    database = metrics.get("database", {})
+    if not database.get("has_database"):
+        return None
+    detected = database.get("detected_databases", [])
+    return ", ".join(detected) if detected and detected != ["Non détecté"] else None
 
 
 def build_prompt_from_metrics(metrics: dict, language: str = "fr") -> str:
@@ -39,6 +61,8 @@ def build_prompt_from_metrics(metrics: dict, language: str = "fr") -> str:
             "num_hotspots": metrics.get("num_hotspots", 0),
         },
         "anti_patterns": metrics.get("anti_patterns", []),
+        "language": _detected_language(metrics),
+        "database_name": _detected_database(metrics),
     }
     return build_user_message(language, input_data)
 
@@ -57,46 +81,73 @@ def call_model(prompt: str, model_path: str | None, mock: bool = False, language
                 {"phase": 2, "action": "Améliorer les tests", "duration_days": 15},
             ],
             "risk_assessment": "Modéré",
+            "inference_mode": "mock",
         }
 
     if model_path:
         try:
             import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer
+            from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 
-            tokenizer = AutoTokenizer.from_pretrained(model_path)
-            model = AutoModelForCausalLM.from_pretrained(
+            # Gemma 3 is multimodal — Gemma3ForConditionalGeneration + AutoProcessor
+            # is the officially documented loading path (not AutoModelForCausalLM),
+            # same as training/finetune_lora_amd.ipynb.
+            processor = AutoProcessor.from_pretrained(model_path)
+            model = Gemma3ForConditionalGeneration.from_pretrained(
                 model_path,
                 torch_dtype=torch.bfloat16,
                 device_map="auto",
             )
 
             messages = [
-                {"role": "system", "content": SYSTEM_PROMPT[language]},
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT[language]}]},
+                {"role": "user", "content": [{"type": "text", "text": prompt}]},
             ]
-            formatted = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
+            inputs = processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            ).to(model.device, dtype=torch.bfloat16)
 
-            inputs = tokenizer(formatted, return_tensors="pt").to("cuda")
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=1000,
                 temperature=0.3,
                 do_sample=True,
             )
-            response = tokenizer.decode(
-                outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True
+            response = processor.tokenizer.decode(
+                outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
             )
 
             json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                return json.loads(json_match.group()) | {"inference_mode": "fine-tuned"}
         except Exception:
-            pass
+            logger.exception("Fine-tuned model inference failed, falling back to mock")
 
     return call_model(prompt, None, mock=True, language=language)
+
+
+def _phase_duration_days(phase: dict) -> float:
+    """Extract a duration estimate in days from a phase dict.
+
+    The fine-tuned model emits `duration_days_range` (e.g. "15-20") rather than
+    a single `duration_days` int — average the range as a point estimate.
+    Falls back to `duration_days` if present, for older data/other formats.
+    """
+    if phase.get("duration_days") is not None:
+        return phase["duration_days"] or 0
+
+    duration_range = phase.get("duration_days_range")
+    if not duration_range:
+        return 0
+
+    numbers = [int(n) for n in re.findall(r"\d+", str(duration_range))]
+    if not numbers:
+        return 0
+    return sum(numbers) / len(numbers)
 
 
 def _normalize_metrics(metrics: dict) -> dict:
@@ -135,6 +186,7 @@ def run_pipeline(
 
     progress(3)
     recommendation = call_model(prompt, model_path, mock=mock, language=language)
+    inference_mode = recommendation.pop("inference_mode", "mock")
 
     progress(4)
     current_stack = metrics.get("architecture_pattern", "Django").split("(")[0].strip()
@@ -150,7 +202,8 @@ def run_pipeline(
     duration_days = 0
     effective_team_size = team_size
     for phase in recommendation.get("phases", []):
-        duration_days += phase.get("duration_days", 0)
+        duration_days += _phase_duration_days(phase)
+    duration_days = round(duration_days)
     if "team_size_recommended" in recommendation:
         effective_team_size = recommendation["team_size_recommended"]
 
@@ -173,6 +226,7 @@ def run_pipeline(
         "date": date.today().isoformat(),
         "metrics": metrics,
         "recommendation": recommendation,
+        "inference_mode": inference_mode,
         "cost_analysis": {
             "migration_cost": cost_data["migration_cost"],
             "current_cloud_cost": cost_data["current_cloud_cost"],

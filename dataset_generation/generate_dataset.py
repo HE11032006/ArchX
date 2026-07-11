@@ -35,7 +35,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError, APIConnectionError, APITimeoutError
 
-from .scenario_axes import Scenario, sample_scenarios
+from .scenario_axes import STACKS, Scenario, sample_scenarios
 from .teacher_prompts import build_prompts
 
 
@@ -55,7 +55,9 @@ FORBIDDEN_PATTERNS = [
 
 
 _MIGRATION_KEYWORDS = re.compile(
-    r"\b(migrat|rewrite|réécri|réécr|remplacer.*stack|switch.*to|passer.*à|adopt.*new.*stack)\b",
+    # "migr\w*" attrape "migrer"/"migration"/"migrate"/"migrating"/"migré" — l'ancien radical
+    # "migrat" ne matchait QUE les formes en -ation/-ate, pas le verbe français "migrer".
+    r"\b(migr\w*|rewrite|réécri|réécr|remplacer.*stack|switch.*to|passer.*à|adopt.*new.*stack)\b",
     re.IGNORECASE,
 )
 _NO_MIGRATION_PATTERNS = re.compile(
@@ -71,6 +73,28 @@ def _recommends_migration(text: str) -> bool:
     if _NO_MIGRATION_PATTERNS.search(text):
         return False
     return bool(_MIGRATION_KEYWORDS.search(text))
+
+
+_ALL_STACK_TOKENS = {token for stack in STACKS for token in stack}
+
+
+def _foreign_stack_mentions(text: str, scenario: Scenario) -> set[str]:
+    """Détecte des mentions de langage/framework/BDD qui n'appartiennent PAS à la
+    stack de ce scénario dans `text` (censé décrire le projet TEL QU'IL EST, pas une
+    cible de migration — c'est pourquoi on ne l'applique qu'à project_description,
+    jamais à analysis/recommendation où citer une stack cible est légitime).
+
+    Garde-fou complémentaire à generate_dataset.py's REQUIRED_FIELDS/FORBIDDEN_PATTERNS :
+    empêche le teacher de décrire un projet avec une stack incohérente avec celle
+    réellement fournie dans le scénario (root cause du bug de hallucination de stack
+    constaté sur le modèle fine-tuné — voir training/format_for_training.py SYSTEM_PROMPT).
+    """
+    own_tokens = {scenario.language, scenario.framework, scenario.database}
+    foreign_tokens = _ALL_STACK_TOKENS - own_tokens
+    return {
+        token for token in foreign_tokens
+        if re.search(rf"\b{re.escape(token)}\b", text, re.IGNORECASE)
+    }
 
 
 @dataclass
@@ -117,6 +141,13 @@ def validate_output(raw_text: str, scenario: Scenario) -> tuple[dict | None, Val
         data.get("recommendation", "") + " " + data.get("analysis", "")
     ):
         needs_review = True  # cas critique mais aucune action structurante proposée : à vérifier aussi
+
+
+    # 4. project_description mentionne une stack qui n'est pas celle du scénario
+    #    -> le teacher a confondu/halluciné la stack, à relire avant d'entraîner dessus.
+    foreign_stack = _foreign_stack_mentions(data.get("project_description", ""), scenario)
+    if foreign_stack:
+        needs_review = True
 
 
     return data, ValidationResult(ok=True, needs_review=needs_review)
@@ -278,6 +309,16 @@ def generate_dataset(
                         "team_size": scenario.team_size,
                         "metrics": scenario.metrics,
                         "anti_patterns": scenario.anti_patterns,
+                        # Uniquement les champs de scenario_axes.Scenario qu'un vrai
+                        # collector.py peut honnêtement fournir en production
+                        # (voir api/services/pipeline.py::build_prompt_from_metrics).
+                        # pct_junior/pct_senior/codebase_age_years/dominant_constraint/
+                        # framework sont vus par le teacher (teacher_prompts.py) mais
+                        # PAS inclus ici exprès : les inclure entraînerait le modèle à
+                        # s'attendre à des infos qu'on ne peut pas lui fournir réellement,
+                        # et il les halluciné à la place (cf. bug constaté en test manuel).
+                        "language": scenario.language,
+                        "database_name": scenario.database,
                     },
                 }
 
