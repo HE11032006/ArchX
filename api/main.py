@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import settings
-from api.routes import analyze, demo_projects, health, jobs
+from api.routes import analyze, demo_projects, feedback, health, jobs, simulate
 
 app = FastAPI(title="ArchX API", version="1.0.0")
 
@@ -20,3 +20,5 @@ app.include_router(health.router)
 app.include_router(demo_projects.router)
 app.include_router(analyze.router)
 app.include_router(jobs.router)
+app.include_router(feedback.router)
+app.include_router(simulate.router)

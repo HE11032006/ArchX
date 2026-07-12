@@ -1,7 +1,8 @@
 import { Badge } from "@/shared/ui/badge";
+import type { AntiPattern } from "@/shared/types/report";
 
 interface AntiPatternsListProps {
-  patterns: string[];
+  patterns: AntiPattern[];
 }
 
 export function AntiPatternsList({ patterns }: AntiPatternsListProps) {
@@ -16,13 +17,14 @@ export function AntiPatternsList({ patterns }: AntiPatternsListProps) {
   return (
     <div className="neon-card p-6">
       <div className="flex flex-wrap gap-2">
-        {patterns.map((pattern) => (
+        {patterns.map((pattern, i) => (
           <Badge
-            key={pattern}
+            key={`${pattern.type}-${i}`}
             variant="outline"
             className="border-magenta/40 text-magenta"
+            title={`${pattern.location} — ${pattern.detail}`}
           >
-            {pattern}
+            {pattern.type}
           </Badge>
         ))}
       </div>

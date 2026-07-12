@@ -14,6 +14,43 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+# Coûts mensuels estimés (€) pour une charge "medium" (~500 req/sec).
+# Basé sur des données publiques (TechEmpower, grilles tarifaires AWS/Azure/GCP).
+# Module-level (pas local à estimate_cloud_cost_from_stack) pour être réutilisable
+# ailleurs (ex: liste des stacks disponibles pour le simulateur de migration).
+STACK_MONTHLY_COSTS: dict[str, float] = {
+    "Django": 2450,
+    "Flask": 2100,
+    "FastAPI": 1800,
+    "Go": 1200,
+    "Rust": 800,
+    "Node.js": 1600,
+    "Spring Boot": 2800,
+    "Laravel": 2300,
+    "Rails": 2200,
+    "ASP.NET Core": 2500,
+}
+
+# Suggestions de cibles de migration "typiques" par stack actuelle — heuristique
+# simple, pas une vérité absolue. Sert de point de départ raisonnable au
+# simulateur de migration, pas une recommandation définitive.
+DEFAULT_MIGRATION_SUGGESTIONS: dict[str, list[str]] = {
+    "Django": ["FastAPI", "Go"],
+    "Flask": ["FastAPI", "Go"],
+    "FastAPI": ["Go"],
+    "Ruby": [],
+    "Rails": ["Go", "Node.js"],
+    "PHP": [],
+    "Laravel": ["Node.js", "Go"],
+    "Node.js": ["Go"],
+    "Java": [],
+    "Spring Boot": ["Go", "FastAPI"],
+    ".NET": [],
+    "ASP.NET Core": ["Go", "FastAPI"],
+    "Go": [],
+    "Rust": [],
+}
+
 
 @dataclass
 class CostReport:
@@ -100,29 +137,62 @@ def estimate_cloud_cost_from_stack(stack_name: str, scale: str = "medium") -> fl
     Returns:
         Coût mensuel estimé en euros
     """
-    # Coûts mensuels estimés (€) pour une charge "medium" (~500 req/sec)
-    costs = {
-        "Django": 2450,
-        "Flask": 2100,
-        "FastAPI": 1800,
-        "Go": 1200,
-        "Rust": 800,
-        "Node.js": 1600,
-        "Spring Boot": 2800,
-        "Laravel": 2300,
-        "Rails": 2200,
-        "ASP.NET Core": 2500,
-    }
-    
     scale_factors = {
         "small": 0.3,
         "medium": 1.0,
         "large": 2.5,
     }
-    
-    base_cost = costs.get(stack_name, 2000)  # valeur par défaut
+
+    base_cost = STACK_MONTHLY_COSTS.get(stack_name, 2000)  # valeur par défaut
     factor = scale_factors.get(scale, 1.0)
     return round(base_cost * factor, 2)
+
+
+def suggest_target_stacks(
+    current_stack: str,
+    coupling_score: float,
+    cohesion_score: float,
+) -> list[str]:
+    """
+    Suggère 1 à 3 stacks cibles "typiques" pour le simulateur de migration,
+    à partir de signaux RÉELS uniquement (stack actuelle, couplage, cohésion
+    — tous calculés par architect_insight/metrics/patterns.py). Aucune donnée
+    inventée (pas de "profil"/secteur, qui n'existe pas dans un vrai scan).
+
+    Heuristique volontairement simple (seuils modifiables) :
+    - Part de DEFAULT_MIGRATION_SUGGESTIONS[current_stack] comme base.
+    - Si le couplage est élevé (>= 7.0/10), priorise une stack orientée
+      découplage/typage statique (Go) en tête de liste.
+    - Exclut toujours current_stack du résultat.
+    - Si le résultat est vide (stack inconnue ou déjà "optimale"), replie sur
+      les 2 stacks les moins chères de STACK_MONTHLY_COSTS.
+    - Plafonné à 3 suggestions.
+    """
+    suggestions = [
+        s for s in DEFAULT_MIGRATION_SUGGESTIONS.get(current_stack, []) if s != current_stack
+    ]
+
+    if coupling_score >= 7.0 and current_stack != "Go":
+        # Move Go to the front (whether or not it was already in the list) —
+        # a high-coupling signal should make it the top suggestion, not just
+        # "present somewhere."
+        if "Go" in suggestions:
+            suggestions.remove("Go")
+        suggestions.insert(0, "Go")
+
+    if not suggestions:
+        cheapest = sorted(STACK_MONTHLY_COSTS, key=lambda s: STACK_MONTHLY_COSTS[s])
+        suggestions = [s for s in cheapest if s != current_stack][:2]
+
+    # Dédoublonne en gardant l'ordre (Go peut avoir été insérée en double)
+    seen: set[str] = set()
+    deduped = []
+    for s in suggestions:
+        if s not in seen:
+            seen.add(s)
+            deduped.append(s)
+
+    return deduped[:3]
 
 
 def compute_full_report(

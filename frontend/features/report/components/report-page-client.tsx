@@ -48,5 +48,5 @@ export function ReportPageClient({ jobId }: ReportPageClientProps) {
     );
   }
 
-  return <ReportView report={job.report} repoUrl={job.report.repo} />;
+  return <ReportView report={job.report} repoUrl={job.report.repo} jobId={jobId} />;
 }

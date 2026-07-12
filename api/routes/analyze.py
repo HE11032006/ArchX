@@ -58,12 +58,14 @@ def _run_job(job_id: str) -> None:
             on_progress=on_progress,
         )
 
+        prompt = report.pop("prompt", None)
         job_store.update(
             job_id,
             status="completed",
             step=5,
             step_label="Finalizing report",
             report=report,
+            prompt=prompt,
         )
     except Exception as exc:
         job_store.update(

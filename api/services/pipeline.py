@@ -11,6 +11,7 @@ from typing import Any
 
 from architect_insight.collector import collect
 from architect_insight.metrics.cost_calculator import compute_full_report, cost_report_to_dict
+from architect_insight.metrics.fix_prompts import generate_fix_prompts
 from training.format_for_training import SYSTEM_PROMPT, build_user_message
 
 from api.services.health import compute_health_band
@@ -153,17 +154,28 @@ def _phase_duration_days(phase: dict) -> float:
     return sum(numbers) / len(numbers)
 
 
+def derive_current_stack(metrics: dict) -> str:
+    """Same heuristic used for the original single migration-cost pick: strip
+    any parenthetical detail from architecture_pattern (e.g. 'Django (MVT)' ->
+    'Django'). Known limitation: non-framework patterns (e.g. 'Hexagonal /
+    Clean Architecture') won't match a STACK_MONTHLY_COSTS key and fall back
+    to the default cost estimate — not fixed here, out of scope."""
+    return metrics.get("architecture_pattern", "Django").split("(")[0].strip()
+
+
+def derive_duration_days(phases: list[dict]) -> int:
+    return round(sum(_phase_duration_days(p) for p in phases))
+
+
 def _normalize_metrics(metrics: dict) -> dict:
-    """Normalize collector output for frontend consumption."""
-    normalized = dict(metrics)
+    """Normalize collector output for frontend consumption.
 
-    anti_patterns = normalized.get("anti_patterns", [])
-    normalized["anti_patterns"] = [
-        p["type"] if isinstance(p, dict) else str(p)
-        for p in anti_patterns
-    ]
-
-    return normalized
+    anti_patterns are passed through as full {type, location, severity, detail}
+    objects (collector.py already produces this shape) — NOT flattened to bare
+    type strings. The frontend needs location/detail to build fix prompts
+    (see fix_prompts.py); flattening here used to silently discard them.
+    """
+    return dict(metrics)
 
 
 def run_pipeline(
@@ -183,6 +195,7 @@ def run_pipeline(
     progress(1)
     raw_metrics = collect(repo_path)
     metrics = _normalize_metrics(raw_metrics)
+    fix_prompts = generate_fix_prompts(raw_metrics.get("anti_patterns", []), raw_metrics)
 
     progress(2)
     prompt = build_prompt_from_metrics(raw_metrics, language)
@@ -192,7 +205,7 @@ def run_pipeline(
     inference_mode = recommendation.pop("inference_mode", "mock")
 
     progress(4)
-    current_stack = metrics.get("architecture_pattern", "Django").split("(")[0].strip()
+    current_stack = derive_current_stack(metrics)
 
     target_stack = None
     if recommendation.get("recommendation") == "migration":
@@ -202,11 +215,8 @@ def run_pipeline(
         else:
             target_stack = "FastAPI"
 
-    duration_days = 0
     effective_team_size = team_size
-    for phase in recommendation.get("phases", []):
-        duration_days += _phase_duration_days(phase)
-    duration_days = round(duration_days)
+    duration_days = derive_duration_days(recommendation.get("phases", []))
     if "team_size_recommended" in recommendation:
         effective_team_size = recommendation["team_size_recommended"]
 
@@ -230,6 +240,8 @@ def run_pipeline(
         "metrics": metrics,
         "recommendation": recommendation,
         "inference_mode": inference_mode,
+        "prompt": prompt,
+        "fix_prompts": fix_prompts,
         "cost_analysis": {
             "migration_cost": cost_data["migration_cost"],
             "current_cloud_cost": cost_data["current_cloud_cost"],

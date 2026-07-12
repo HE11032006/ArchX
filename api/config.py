@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -14,8 +15,20 @@ class Settings(BaseSettings):
 
     archx_model_path: str | None = None
     archx_mock_inference: bool | None = None
+
+    @field_validator("archx_mock_inference", mode="before")
+    @classmethod
+    def _empty_string_as_unset(cls, value: object) -> object:
+        """A `.env` line like `ARCHX_MOCK_INFERENCE=` (no value) is the common
+        way to leave a setting unset — pydantic-settings otherwise fails to
+        parse "" as a bool. Treat blank as None (falls back to the
+        archx_model_path-based default in use_mock_inference below)."""
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
     cors_origins: list[str] = ["http://localhost:3000"]
     demo_projects_dir: Path = PROJECT_ROOT / "demo_projects"
+    archx_feedback_path: Path = PROJECT_ROOT / "feedback" / "collected_feedback.jsonl"
     archx_clone_dir: Path = PROJECT_ROOT / "tmp" / "clones"
     archx_clone_timeout: int = 120
     archx_clone_depth: int = 500
