@@ -35,3 +35,7 @@ skills-lock.json
 
 # Fichiers de preview temporaires
 archx_design_preview.html
+training/architect-insight-lora/
+training/architect-insight-lora-final/
+training/architect-insight-gemma4-merged/
+training/.ipynb_checkpoints/
