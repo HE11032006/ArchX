@@ -86,6 +86,12 @@ class Scenario:
     health_band: str
     metrics: dict = field(default_factory=dict)
     anti_patterns: list = field(default_factory=list)
+    # True si un vrai collector.py pourrait détecter ce langage/BDD en production
+    # (~75% des cas). Sur le reste (~25%), le teacher ne doit PAS écrire la stack
+    # dans project_description, pour que le student voie aussi des exemples où
+    # aucune stack n'est mentionnée (sinon il n'apprend qu'à toujours en inventer
+    # une quand l'info manque réellement — cf. bug constaté sur le modèle Gemma 4).
+    stack_known: bool = True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -141,6 +147,13 @@ def sample_scenarios(n: int, seed: int = 42) -> list[Scenario]:
 
         module_hint = sector.split(" ")[0].split("/")[0].strip().lower().replace("é", "e")
 
+        # Dérivé de la position (pas d'un nouveau tirage rng) pour ne pas décaler
+        # le flux aléatoire et casser la reproductibilité des scénarios déjà
+        # générés avec seed=42 (backfill_stack_fields.py, reconcile_flagged_examples.py,
+        # tests/test_dataset_consistency.py en dépendent tous). 1 scénario sur 4
+        # simule une stack non détectée par le collector.
+        stack_known = len(scenarios) % 4 != 0
+
         scenario = Scenario(
             scenario_id=f"scn_{len(scenarios):04d}",
             sector=sector,
@@ -155,6 +168,7 @@ def sample_scenarios(n: int, seed: int = 42) -> list[Scenario]:
             health_band=band,
             metrics=_sample_metrics(rng, band),
             anti_patterns=_sample_anti_patterns(rng, band, module_hint),
+            stack_known=stack_known,
         )
         scenarios.append(scenario)
 

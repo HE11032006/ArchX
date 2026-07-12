@@ -31,6 +31,13 @@ globalement saines (faible couplage, bonne couverture de tests, peu d'anti-patte
 recommander de NE PAS migrer, et proposer plutôt des améliorations incrémentales ciblées.
 - Pour les durées de phases, donne une fourchette réaliste en jours (ex: "10-15 jours"), \
 jamais un chiffre unique à la journée près.
+- L'âge du projet et la proportion junior/senior de l'équipe te sont donnés UNIQUEMENT pour \
+calibrer ton niveau de risque perçu (ex: équipe junior + legacy ancien = risque plus élevé). \
+Ce sont des informations internes à TON raisonnement : ne les énonce JAMAIS comme des faits \
+explicites (un chiffre d'années, un pourcentage junior/senior, ou même une paraphrase comme \
+"équipe majoritairement junior") dans project_description, analysis ou risk_assessment — \
+un outil de production réel n'a jamais accès à ces données, donc les répéter dans ta réponse \
+apprendrait au modèle à inventer des faits qu'il ne peut pas connaître.
 - Réponds uniquement en JSON valide, dans la structure demandée, en français naturel et \
 professionnel (pas de traduction mot à mot depuis l'anglais)."""
 
@@ -47,6 +54,12 @@ overall healthy (low coupling, good test coverage, few anti-patterns), you MUST 
 NOT migrating, and instead propose targeted incremental improvements.
 - For phase durations, give a realistic day range (e.g. "10-15 days"), never a single \
 day-precise number.
+- The project's age and the team's junior/senior split are given ONLY to calibrate your \
+perceived risk level (e.g. junior team + old legacy code = higher risk). These are internal \
+reasoning inputs: NEVER state them as explicit facts (a number of years, a junior/senior \
+percentage, or even a paraphrase like "mostly junior team") in project_description, analysis, \
+or risk_assessment — a real production tool never has access to this data, so repeating it \
+would teach the model to invent facts it cannot actually know.
 - Respond only in valid JSON, in the requested structure, in natural, professional English \
 (not a literal translation)."""
 
@@ -62,13 +75,27 @@ _OUTPUT_SCHEMA_HINT = """{
 def _user_prompt_fr(s: Scenario) -> str:
     ap = "\n".join(f"  - {a['type']} ({a['severity']}) dans {a['location']}" for a in s.anti_patterns) or "  - Aucun anti-pattern significatif détecté"
     m = s.metrics
+    stack_line = (
+        f"- Stack technique détectée : {s.language}/{s.framework}/{s.database}\n"
+        if s.stack_known
+        else "- Stack technique : NON DÉTECTÉE par les outils d'analyse (langage/framework/BDD inconnus à ce stade)\n"
+    )
+    stack_instruction = (
+        "intègre naturellement la stack technique détectée"
+        if s.stack_known
+        else "NE MENTIONNE AUCUNE techno précise (langage, framework, base de données) — reste "
+        "générique sur l'aspect technique puisque cette info n'a pas été détectée"
+    )
     return f"""Voici les données RÉELLES (déjà calculées par des outils d'analyse statique et git) d'un projet à analyser :
 
-CONTEXTE
+CONTEXTE (visible dans ta réponse)
 - Secteur : {s.sector}
+{stack_line}- Contrainte dominante identifiée par l'équipe : {s.dominant_constraint}
+
+CONTEXTE INTERNE (pour calibrer ton raisonnement UNIQUEMENT — ne cite JAMAIS ces chiffres/faits
+dans ta réponse, voir RÈGLES STRICTES ci-dessus)
 - Équipe : {s.team_size} développeurs ({s.pct_junior}% juniors, {s.pct_senior}% seniors)
-- Codebase : {s.codebase_age_years} ans, stack {s.language}/{s.framework}/{s.database}
-- Contrainte dominante identifiée par l'équipe : {s.dominant_constraint}
+- Codebase : {s.codebase_age_years} ans
 
 MÉTRIQUES CALCULÉES
 - Score de couplage : {m['coupling_score']}/10
@@ -81,23 +108,38 @@ ANTI-PATTERNS DÉTECTÉS
 {ap}
 
 Rédige d'abord une description de projet réaliste (2-3 phrases, "project_description") qui \
-intègre ce contexte naturellement, PUIS ton analyse d'architecte senior en JSON selon ce schéma :
+{stack_instruction}, PUIS ton analyse d'architecte senior en JSON selon ce schéma :
 {_OUTPUT_SCHEMA_HINT}
 
 Rappel : pas de montant en euros, pas de ROI en mois, pas de recommandation de migration si \
-les métriques ne la justifient pas clairement."""
+les métriques ne la justifient pas clairement, et aucune mention de l'âge du projet ou de la \
+composition junior/senior de l'équipe (contexte interne uniquement)."""
 
 
 def _user_prompt_en(s: Scenario) -> str:
     ap = "\n".join(f"  - {a['type']} ({a['severity']}) in {a['location']}" for a in s.anti_patterns) or "  - No significant anti-pattern detected"
     m = s.metrics
+    stack_line = (
+        f"- Detected tech stack: {s.language}/{s.framework}/{s.database}\n"
+        if s.stack_known
+        else "- Tech stack: NOT DETECTED by analysis tools (language/framework/database unknown at this stage)\n"
+    )
+    stack_instruction = (
+        "naturally incorporates the detected tech stack"
+        if s.stack_known
+        else "MENTIONS NO specific technology (language, framework, database) — stay generic "
+        "on the technical side since this info was not detected"
+    )
     return f"""Here is the REAL data (already computed by static analysis and git tools) for a project to analyze:
 
-CONTEXT
+CONTEXT (visible in your answer)
 - Sector: {s.sector}
+{stack_line}- Dominant constraint identified by the team: {s.dominant_constraint}
+
+INTERNAL CONTEXT (to calibrate your reasoning ONLY — NEVER cite these numbers/facts in your
+answer, see STRICT RULES above)
 - Team: {s.team_size} developers ({s.pct_junior}% junior, {s.pct_senior}% senior)
-- Codebase: {s.codebase_age_years} years old, stack {s.language}/{s.framework}/{s.database}
-- Dominant constraint identified by the team: {s.dominant_constraint}
+- Codebase: {s.codebase_age_years} years old
 
 COMPUTED METRICS
 - Coupling score: {m['coupling_score']}/10
@@ -110,12 +152,13 @@ DETECTED ANTI-PATTERNS
 {ap}
 
 First write a realistic project description (2-3 sentences, "project_description") that \
-naturally incorporates this context, THEN your senior architect analysis as JSON following \
+{stack_instruction}, THEN your senior architect analysis as JSON following \
 this schema:
 {_OUTPUT_SCHEMA_HINT}
 
 Reminder: no dollar amount, no ROI in months, no migration recommendation if the metrics \
-don't clearly justify one."""
+don't clearly justify one, and no mention of the project's age or the team's junior/senior \
+split (internal context only)."""
 
 
 def build_prompts(scenario: Scenario, language: str) -> tuple[str, str]:

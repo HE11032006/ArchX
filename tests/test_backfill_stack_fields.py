@@ -1,8 +1,12 @@
 """Regression test for the training_data.jsonl / to_review.jsonl backfill.
 
-Locks in: (1) every record's input now carries language/database (the fields
-the hallucination fix relies on), and (2) re-running the backfill script is a
-no-op (idempotent) — it must not silently drift the dataset on a second run.
+Locks in: (1) every record's input carries language/database_name IF AND ONLY
+IF its scenario has stack_known=True (~75% of scenarios — the other ~25%
+intentionally omit them, so the student also learns the "stack not detected
+-> don't invent one" case, see scenario_axes.py::Scenario.stack_known and the
+dataset regeneration that fixed the stack/age/team hallucination bugs), and
+(2) re-running the backfill script is a no-op (idempotent) — it must not
+silently drift the dataset on a second run.
 """
 
 import json
@@ -18,13 +22,23 @@ def _load_all(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def test_all_training_records_have_language_and_database():
+def test_training_records_have_stack_fields_iff_stack_known():
     records = _load_all(DATA_DIR / "training_data.jsonl")
     assert records, "training_data.jsonl should not be empty"
+
+    max_index = max(int(r["scenario_id"].removeprefix("scn_")) for r in records)
+    scenarios_by_id = {s.scenario_id: s for s in sample_scenarios(max_index + 1, seed=42)}
+
     for record in records:
-        assert "language" in record["input"]
-        assert "database_name" in record["input"]
         assert "database" not in record["input"]  # stale key name, must not linger
+
+        scenario = scenarios_by_id.get(record["scenario_id"])
+        if scenario is None or scenario.stack_known:
+            assert "language" in record["input"]
+            assert "database_name" in record["input"]
+        else:
+            assert "language" not in record["input"]
+            assert "database_name" not in record["input"]
 
 
 def test_backfill_is_idempotent(tmp_path):

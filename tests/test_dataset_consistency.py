@@ -1,20 +1,34 @@
 """Regression test: training_data.jsonl must stay consistent with the
 CURRENT validate_output() anti-bias rules (health-band/migration coherence,
-no foreign-stack mentions in project_description).
+no foreign-stack mentions, no undisclosed stack/age/team-composition mentions
+in the narrative fields).
 
 Guards against the _MIGRATION_KEYWORDS regex bug found while adding the
 foreign-stack heuristic: the old "migrat" stem silently never matched the
 French verb "migrer", so ~10% of training_data.jsonl (40/384) had violated
 the "healthy -> no migration recommended" / "critical -> real action
 proposed" guarantee without ever being flagged. Those were moved to
-to_review.jsonl by dataset_generation/reconcile_flagged_examples.py — this
-test ensures no similarly-inconsistent example creeps back in.
+to_review.jsonl by dataset_generation/reconcile_flagged_examples.py.
+
+Also guards against a second, distinct hallucination bug found via a manual
+Gemma 4 inference test: teacher_prompts.py used to hand the teacher the
+project's age and junior/senior split and explicitly ask it to "naturally
+incorporate" that context into project_description — so ~92% (458/500) of
+examples narrated facts (age, team composition) that are never in the
+student's own input. The prompt was fixed to mark that context
+internal-reasoning-only, and Scenario.stack_known now lets ~25% of examples
+train the "stack not detected -> don't mention one" case too.
 """
 
 import json
 from pathlib import Path
 
-from dataset_generation.generate_dataset import _foreign_stack_mentions, _recommends_migration
+from dataset_generation.generate_dataset import (
+    _foreign_stack_mentions,
+    _recommends_migration,
+    _undisclosed_context_mentions,
+    _undisclosed_stack_mentions,
+)
 from dataset_generation.scenario_axes import sample_scenarios
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "dataset_generation"
@@ -42,7 +56,14 @@ def test_no_healthy_or_critical_inconsistency_in_training_data():
             violations.append((record["scenario_id"], "critical+no-action"))
 
         scenario = scenarios_by_id.get(record.get("scenario_id"))
-        if scenario and _foreign_stack_mentions(output.get("project_description", ""), scenario):
-            violations.append((record["scenario_id"], "foreign-stack"))
+        description = output.get("project_description", "")
+        if scenario:
+            if scenario.stack_known and _foreign_stack_mentions(description, scenario):
+                violations.append((record["scenario_id"], "foreign-stack"))
+            if not scenario.stack_known and _undisclosed_stack_mentions(description):
+                violations.append((record["scenario_id"], "undisclosed-stack"))
+
+        if _undisclosed_context_mentions(output):
+            violations.append((record["scenario_id"], "undisclosed-age-or-team"))
 
     assert not violations, f"{len(violations)} inconsistent training examples: {violations[:10]}..."
