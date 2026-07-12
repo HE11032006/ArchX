@@ -87,13 +87,16 @@ def call_model(prompt: str, model_path: str | None, mock: bool = False, language
     if model_path:
         try:
             import torch
-            from transformers import AutoProcessor, Gemma3ForConditionalGeneration
+            from transformers import AutoModelForMultimodalLM, AutoProcessor
 
-            # Gemma 3 is multimodal — Gemma3ForConditionalGeneration + AutoProcessor
+            # Gemma 4 12B Unified is multimodal — AutoModelForMultimodalLM + AutoProcessor
             # is the officially documented loading path (not AutoModelForCausalLM),
-            # same as training/finetune_lora_amd.ipynb.
+            # same as training/finetune_lora_amd.ipynb. Keeping this in sync with the
+            # notebook is critical: a prior mismatch here (Gemma 2 prod vs. a locally
+            # duplicated Gemma 3 training format) caused the model to learn a prompt
+            # format it never saw again in production.
             processor = AutoProcessor.from_pretrained(model_path)
-            model = Gemma3ForConditionalGeneration.from_pretrained(
+            model = AutoModelForMultimodalLM.from_pretrained(
                 model_path,
                 torch_dtype=torch.bfloat16,
                 device_map="auto",
