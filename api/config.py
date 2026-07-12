@@ -11,7 +11,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Absolute path (not ".env") so this is found regardless of the working
+    # directory the process is launched from — a relative path here silently
+    # fails to load (pydantic-settings treats a missing .env as "no overrides",
+    # not an error), which previously caused ARCHX_MODEL_PATH to be ignored
+    # and the API to fall back to mock inference without any visible error.
+    model_config = SettingsConfigDict(
+        env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore"
+    )
 
     archx_model_path: str | None = None
     archx_mock_inference: bool | None = None
