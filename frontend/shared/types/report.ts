@@ -6,6 +6,8 @@ export interface ComplexityHotspot {
   file: string;
   max_complexity: number;
   num_functions: number;
+  num_lines: number;
+  num_imports: number;
 }
 
 export interface GitHotspot {
@@ -13,6 +15,20 @@ export interface GitHotspot {
   total_changes_12mo: number;
   bugfix_changes_12mo: number;
   bugfix_ratio: number;
+}
+
+export interface AntiPattern {
+  type: string;
+  location: string;
+  severity: "low" | "medium" | "high";
+  detail: string;
+}
+
+export interface FixPrompt {
+  type: string;
+  location: string;
+  prompt: string;
+  fallback?: boolean;
 }
 
 export interface Phase {
@@ -35,7 +51,7 @@ export interface Metrics {
   files_analyzed: number;
   total_functions?: number;
   total_classes?: number;
-  anti_patterns: string[];
+  anti_patterns: AntiPattern[];
   complexity_hotspots: ComplexityHotspot[];
   git_hotspots?: GitHotspot[];
   dependencies: {
@@ -89,6 +105,33 @@ export interface Report {
   recommendation: Recommendation;
   cost_analysis: CostAnalysis;
   health_band: HealthBand;
+  fix_prompts?: FixPrompt[];
+}
+
+export interface MigrationTargets {
+  current_stack: string;
+  available_stacks: string[];
+  suggested_stacks: string[];
+}
+
+export interface SimulateMigrationRequest {
+  target_stack: string;
+  team_size?: number;
+  hourly_rate?: number;
+  scale?: "small" | "medium" | "large";
+}
+
+export interface SimulateMigrationResult {
+  current_stack: string;
+  target_stack: string;
+  migration_cost: number;
+  current_cloud_cost: number;
+  target_cloud_cost: number;
+  monthly_savings: number;
+  // null when there are no savings to pay back (FastAPI/Pydantic serialize
+  // Python's float('inf') as null in JSON mode).
+  payback_months: number | null;
+  cost_confidence: string;
 }
 
 export interface HealthConfig {

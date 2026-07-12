@@ -50,3 +50,36 @@ class JobResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str = "ok"
+
+
+class FeedbackRequest(BaseModel):
+    rating: Literal["up", "down"]
+    correction: str | None = Field(default=None, max_length=4000)
+
+
+class FeedbackResponse(BaseModel):
+    ok: bool = True
+
+
+class SimulateMigrationRequest(BaseModel):
+    target_stack: str
+    team_size: int | None = Field(default=None, ge=1, le=100)
+    hourly_rate: float | None = Field(default=None, ge=0)
+    scale: Literal["small", "medium", "large"] = "medium"
+
+
+class SimulateMigrationResponse(BaseModel):
+    current_stack: str
+    target_stack: str
+    migration_cost: float
+    current_cloud_cost: float
+    target_cloud_cost: float
+    monthly_savings: float
+    payback_months: float
+    cost_confidence: str
+
+
+class MigrationTargetsResponse(BaseModel):
+    current_stack: str
+    available_stacks: list[str]
+    suggested_stacks: list[str]

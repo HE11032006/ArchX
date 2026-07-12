@@ -6,8 +6,9 @@ chaque réponse (JSON bien formé + garde-fous respectés + cohérence logique
 avec la bande de santé), et écrit un JSONL prêt pour le fine-tuning.
 
 
-Nécessite une clé API (variable d'environnement OPENROUTER_API_KEY) et le
-paquet `openai` installé.
+Nécessite au moins une clé API parmi ANTHROPIC_API_KEY, GEMINI_API_KEY,
+MISTRAL_API_KEY ou OPENROUTER_API_KEY (fallback ordonné, voir
+call_teacher_model) et les paquets `anthropic`/`openai` installés.
 
 
 Usage réel :
@@ -35,7 +36,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError, APIConnectionError, APITimeoutError
 
-from .scenario_axes import Scenario, sample_scenarios
+from .scenario_axes import STACKS, Scenario, sample_scenarios
 from .teacher_prompts import build_prompts
 
 
@@ -55,7 +56,9 @@ FORBIDDEN_PATTERNS = [
 
 
 _MIGRATION_KEYWORDS = re.compile(
-    r"\b(migrat|rewrite|réécri|réécr|remplacer.*stack|switch.*to|passer.*à|adopt.*new.*stack)\b",
+    # "migr\w*" attrape "migrer"/"migration"/"migrate"/"migrating"/"migré" — l'ancien radical
+    # "migrat" ne matchait QUE les formes en -ation/-ate, pas le verbe français "migrer".
+    r"\b(migr\w*|rewrite|réécri|réécr|remplacer.*stack|switch.*to|passer.*à|adopt.*new.*stack)\b",
     re.IGNORECASE,
 )
 _NO_MIGRATION_PATTERNS = re.compile(
@@ -71,6 +74,62 @@ def _recommends_migration(text: str) -> bool:
     if _NO_MIGRATION_PATTERNS.search(text):
         return False
     return bool(_MIGRATION_KEYWORDS.search(text))
+
+
+_ALL_STACK_TOKENS = {token for stack in STACKS for token in stack}
+
+_AGE_PATTERN = re.compile(r"\b\d+([.,]\d+)?\s*(ans?|années?|years?|year-old)\b", re.IGNORECASE)
+_TEAM_COMPOSITION_PATTERN = re.compile(r"\bjuniors?\b|\bseniors?\b", re.IGNORECASE)
+
+
+def _foreign_stack_mentions(text: str, scenario: Scenario) -> set[str]:
+    """Détecte des mentions de langage/framework/BDD qui n'appartiennent PAS à la
+    stack de ce scénario dans `text` (censé décrire le projet TEL QU'IL EST, pas une
+    cible de migration — c'est pourquoi on ne l'applique qu'à project_description,
+    jamais à analysis/recommendation où citer une stack cible est légitime).
+
+    Garde-fou complémentaire à generate_dataset.py's REQUIRED_FIELDS/FORBIDDEN_PATTERNS :
+    empêche le teacher de décrire un projet avec une stack incohérente avec celle
+    réellement fournie dans le scénario (root cause du bug de hallucination de stack
+    constaté sur le modèle fine-tuné — voir training/format_for_training.py SYSTEM_PROMPT).
+    """
+    own_tokens = {scenario.language, scenario.framework, scenario.database}
+    foreign_tokens = _ALL_STACK_TOKENS - own_tokens
+    return {
+        token for token in foreign_tokens
+        if re.search(rf"\b{re.escape(token)}\b", text, re.IGNORECASE)
+    }
+
+
+def _undisclosed_stack_mentions(text: str) -> set[str]:
+    """Pour un scénario stack_known=False : AUCUNE techno ne devrait apparaître,
+    pas même la "vraie" stack du scénario (elle n'est par construction pas censée
+    être connue). Contrairement à _foreign_stack_mentions, on n'exclut pas les
+    tokens propres au scénario ici."""
+    return {
+        token for token in _ALL_STACK_TOKENS
+        if re.search(rf"\b{re.escape(token)}\b", text, re.IGNORECASE)
+    }
+
+
+def _undisclosed_context_mentions(data: dict) -> list[str]:
+    """Détecte des mentions de l'âge du projet ou de la composition junior/senior
+    de l'équipe dans les champs narratifs de la réponse.
+
+    Root cause d'un bug d'hallucination distinct de celui de la stack : ces deux
+    infos sont données au teacher (teacher_prompts.py, section "CONTEXTE INTERNE")
+    pour calibrer son raisonnement (risque perçu), mais ne sont JAMAIS fournies au
+    student/production (api/services/pipeline.py ne peut pas les détecter). Avant
+    ce fix, le teacher les narrait "naturellement" comme demandé par l'ancien
+    prompt — confirmé sur ~92% (458/500) des exemples du dataset existant.
+    """
+    text = " ".join(str(data.get(k, "")) for k in ("project_description", "analysis", "risk_assessment"))
+    hits = []
+    if _AGE_PATTERN.search(text):
+        hits.append("âge du projet")
+    if _TEAM_COMPOSITION_PATTERN.search(text):
+        hits.append("composition junior/senior")
+    return hits
 
 
 @dataclass
@@ -119,14 +178,55 @@ def validate_output(raw_text: str, scenario: Scenario) -> tuple[dict | None, Val
         needs_review = True  # cas critique mais aucune action structurante proposée : à vérifier aussi
 
 
+    # 4. project_description mentionne une stack qui n'est pas celle du scénario
+    #    -> le teacher a confondu/halluciné la stack, à relire avant d'entraîner dessus.
+    description = data.get("project_description", "")
+    if scenario.stack_known:
+        if _foreign_stack_mentions(description, scenario):
+            needs_review = True
+    else:
+        # stack_known=False : même la "vraie" stack du scénario ne devrait pas
+        # apparaître, puisqu'elle est censée être non détectée à ce stade.
+        if _undisclosed_stack_mentions(description):
+            needs_review = True
+
+
+    # 5. Âge du projet / composition junior-senior narrés alors qu'ils ne sont
+    #    jamais fournis au student (voir _undisclosed_context_mentions).
+    if _undisclosed_context_mentions(data):
+        needs_review = True
+
+
     return data, ValidationResult(ok=True, needs_review=needs_review)
 
 
 def call_teacher_model(system: str, user: str, model: str = "google/gemma-2-9b-it:free") -> str:
-    """Appelle les fournisseurs IA disponibles avec fallback ordonné : Gemini -> Mistral -> OpenRouter."""
+    """Appelle les fournisseurs IA disponibles avec fallback ordonné : Claude -> Gemini -> Mistral -> OpenRouter."""
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
     mistral_key = os.environ.get("MISTRAL_API_KEY")
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")
+
+    # Étape 0 : Tenter Claude en premier — son suivi d'instructions est le plus fiable
+    # pour respecter les règles nuancées du prompt (contexte interne vs. citable,
+    # cf. teacher_prompts.py), ce qui compte particulièrement pour régénérer le
+    # dataset proprement après le fix des bugs de hallucination.
+    if anthropic_key:
+        try:
+            import anthropic
+
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1024,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+            content = response.content[0].text
+            if content:
+                return content
+        except Exception as e:
+            print(f"  [CLAUDE FAILS] Erreur lors de l'appel Claude: {e}. Bascule sur Gemini...")
 
     # Étape 1 : Tenter Gemini (Google AI Studio)
     if gemini_key:
@@ -269,16 +369,34 @@ def generate_dataset(
 
 
                 data, result = validate_output(raw, scenario)
+                base_input = {
+                    "sector": scenario.sector,
+                    "team_size": scenario.team_size,
+                    "metrics": scenario.metrics,
+                    "anti_patterns": scenario.anti_patterns,
+                    # Uniquement les champs de scenario_axes.Scenario qu'un vrai
+                    # collector.py peut honnêtement fournir en production
+                    # (voir api/services/pipeline.py::build_prompt_from_metrics).
+                    # pct_junior/pct_senior/codebase_age_years/dominant_constraint/
+                    # framework sont vus par le teacher (teacher_prompts.py) mais
+                    # PAS inclus ici exprès : les inclure entraînerait le modèle à
+                    # s'attendre à des infos qu'on ne peut pas lui fournir réellement,
+                    # et il les halluciné à la place (cf. bug constaté en test manuel).
+                }
+                if scenario.stack_known:
+                    # ~75% des scénarios : le student voit language/database_name,
+                    # exactement comme quand collector.py détecte réellement la stack.
+                    base_input["language"] = scenario.language
+                    base_input["database_name"] = scenario.database
+                # Sinon (~25% des scénarios) : ces clés sont absentes, comme quand
+                # collector.py échoue à fingerprinter le repo — le student doit
+                # aussi voir ce cas à l'entraînement, sinon il ne sait que
+                # halluciner une stack quand l'info manque réellement en prod.
                 record = {
                     "scenario_id": scenario.scenario_id,
                     "language": lang,
                     "health_band": scenario.health_band,
-                    "input": {
-                        "sector": scenario.sector,
-                        "team_size": scenario.team_size,
-                        "metrics": scenario.metrics,
-                        "anti_patterns": scenario.anti_patterns,
-                    },
+                    "input": base_input,
                 }
 
 

@@ -22,6 +22,11 @@ class Job:
     language: str = "fr"
     team_size: int = 8
     hourly_rate: float = 80.0
+    # Exact prompt sent to the model for this job's report — kept server-side
+    # only (never included in JobResponse.report) so feedback submissions can
+    # capture a (prompt, output) pair usable for a future fine-tune, without
+    # exposing the raw prompt to the frontend.
+    prompt: str | None = None
 
 
 class JobStore:
@@ -62,6 +67,7 @@ class JobStore:
         step_label: str | None = None,
         error: str | None = None,
         report: dict | None = None,
+        prompt: str | None = None,
     ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -77,6 +83,8 @@ class JobStore:
                 job.error = error
             if report is not None:
                 job.report = report
+            if prompt is not None:
+                job.prompt = prompt
 
 
 job_store = JobStore()

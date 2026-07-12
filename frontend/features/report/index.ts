@@ -7,3 +7,7 @@ export { AntiPatternsList } from "./components/anti-patterns-list";
 export { HotspotsTable } from "./components/hotspots-table";
 export { StackPanel } from "./components/stack-panel";
 export { SectionHeader } from "./components/section-header";
+export { FeedbackPanel } from "./components/feedback-panel";
+export { MigrationSimulator } from "./components/migration-simulator";
+export { DebtMap } from "./components/debt-map";
+export { FixPromptsList } from "./components/fix-prompts-list";

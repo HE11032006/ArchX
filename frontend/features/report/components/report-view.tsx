@@ -5,8 +5,11 @@ import type { HealthBand, Report } from "@/shared/types/report";
 import { ActionPlan } from "./action-plan";
 import { AntiPatternsList } from "./anti-patterns-list";
 import { CostPanel } from "./cost-panel";
-import { HotspotsTable } from "./hotspots-table";
+import { DebtMap } from "./debt-map";
+import { FeedbackPanel } from "./feedback-panel";
+import { FixPromptsList } from "./fix-prompts-list";
 import { MetricCard } from "./metric-card";
+import { MigrationSimulator } from "./migration-simulator";
 import { SectionHeader } from "./section-header";
 import { StackPanel } from "./stack-panel";
 
@@ -19,9 +22,10 @@ const recommendationLabels = {
 interface ReportViewProps {
   report: Report;
   repoUrl?: string;
+  jobId: string;
 }
 
-export function ReportView({ report, repoUrl }: ReportViewProps) {
+export function ReportView({ report, repoUrl, jobId }: ReportViewProps) {
   const { metrics, recommendation, cost_analysis, health_band } = report;
   const health = getHealthDisplay(health_band as HealthBand, metrics);
   const rec =
@@ -137,11 +141,17 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
         </div>
       )}
 
+      {/* Fix prompts */}
+      <div className="mb-8">
+        <SectionHeader title="Fix Prompts" accent="cyan" />
+        <FixPromptsList prompts={report.fix_prompts ?? []} />
+      </div>
+
       {/* Hotspots */}
       <div className="mb-8">
         <SectionHeader title="Risk Hotspots" />
-        <HotspotsTable
-          complexityHotspots={metrics.complexity_hotspots ?? []}
+        <DebtMap
+          hotspots={metrics.complexity_hotspots ?? []}
           gitHotspots={metrics.git_hotspots}
         />
       </div>
@@ -152,11 +162,14 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
         <p className="leading-relaxed text-white/60">{recommendation.analysis}</p>
       </div>
 
+      {/* Feedback */}
+      <FeedbackPanel jobId={jobId} />
+
       {/* Action plan */}
       <ActionPlan phases={recommendation.phases} />
 
       {/* Cost + Risk */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="mb-8 grid gap-6 md:grid-cols-2">
         <CostPanel costAnalysis={cost_analysis} />
         <div className="neon-card p-6">
           <SectionHeader title="Risk Assessment" accent="muted" />
@@ -165,6 +178,9 @@ export function ReportView({ report, repoUrl }: ReportViewProps) {
           </p>
         </div>
       </div>
+
+      {/* Migration simulator */}
+      <MigrationSimulator jobId={jobId} />
     </section>
   );
 }

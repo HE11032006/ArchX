@@ -61,9 +61,20 @@ def collect(repo_path: str) -> dict:
         rel_path = os.path.relpath(full_path, repo_path)
         all_files.append(analyze_source(rel_path, source))
 
+    # Calculé avant le bloc anti_patterns pour pouvoir y fusionner les
+    # anti-patterns Java (detect_anti_patterns est full duck-typed : les
+    # dataclasses de java_analyzer.py reprennent exactement la forme de
+    # FileMetrics/FunctionMetrics/ClassMetrics, aucune adaptation nécessaire).
+    java_metrics = analyze_java_directory(repo_path)
+
     anti_patterns = []
     for fm in all_files:
         anti_patterns.extend(p.to_dict() for p in detect_anti_patterns(fm))
+    # "files" contient des dataclasses JavaFileMetrics (pas JSON-serializable) —
+    # utilisées ici uniquement pour la fusion des anti-patterns, puis retirées
+    # avant que java_metrics parte dans le rapport final (voir plus bas).
+    for java_fm in java_metrics.pop("files", []):
+        anti_patterns.extend(p.to_dict() for p in detect_anti_patterns(java_fm))
 
     # tri par sévérité pour mettre les plus critiques en premier
     severity_rank = {"high": 0, "medium": 1, "low": 2}
@@ -92,7 +103,7 @@ def collect(repo_path: str) -> dict:
     performance = detect_performance(repo_path)
     # Analyse multi-langages avancée (AST)
     js_metrics = analyze_js_directory(repo_path)
-    java_metrics = analyze_java_directory(repo_path)
+    # java_metrics déjà calculé plus haut (nécessaire avant le bloc anti_patterns)
     dart_metrics = analyze_dart_directory(repo_path)
     # Analyse AST multi-langages (nouveaux)
     go_metrics = analyze_go_directory(repo_path)
@@ -121,6 +132,8 @@ def collect(repo_path: str) -> dict:
                 "file": fm.path,
                 "max_complexity": fm.max_complexity,
                 "num_functions": len(fm.functions),
+                "num_lines": fm.num_lines,
+                "num_imports": fm.num_imports,
             }
             for fm in complexity_hotspots
         ],

@@ -12,11 +12,24 @@ export const mockReport: Report = {
     test_coverage_estimate: 66.6,
     top_hotspot_bugfix_ratio: 0.12,
     files_analyzed: 1402,
-    anti_patterns: ["God Class", "Long Method", "Circular Dependency"],
+    anti_patterns: [
+      {
+        type: "God Class",
+        location: "core/views.py:DashboardView (L42)",
+        severity: "high",
+        detail: "18 méthodes, 340 lignes (seuils: 15 méthodes / 300 lignes)",
+      },
+      {
+        type: "Long Method",
+        location: "api/serializers.py:validate (L88)",
+        severity: "medium",
+        detail: "72 lignes, complexité cyclomatique 11 (seuils: 60 lignes / 10)",
+      },
+    ],
     complexity_hotspots: [
-      { file: "core/views.py", max_complexity: 18, num_functions: 12 },
-      { file: "api/serializers.py", max_complexity: 11, num_functions: 8 },
-      { file: "users/models.py", max_complexity: 9, num_functions: 6 },
+      { file: "core/views.py", max_complexity: 18, num_functions: 12, num_lines: 640, num_imports: 24 },
+      { file: "api/serializers.py", max_complexity: 11, num_functions: 8, num_lines: 320, num_imports: 14 },
+      { file: "users/models.py", max_complexity: 9, num_functions: 6, num_lines: 210, num_imports: 9 },
     ],
     git_hotspots: [
       { file: "core/views.py", total_changes_12mo: 42, bugfix_changes_12mo: 8, bugfix_ratio: 0.19 },
@@ -73,6 +86,15 @@ export const mockReport: Report = {
     risk_assessment:
       "Modéré — Risque principal sur les dépendances externes (paiement, logistique).",
   },
+  fix_prompts: [
+    {
+      type: "God Class",
+      location: "core/views.py:DashboardView (L42)",
+      prompt:
+        "Refactor the God Class at core/views.py:DashboardView (L42). 18 méthodes, 340 lignes. Propose a concrete extraction plan...",
+      fallback: false,
+    },
+  ],
   cost_analysis: {
     migration_cost: 42000,
     current_cloud_cost: 2450,

@@ -2,7 +2,8 @@
 # Pas de dépendances externes nécessaires (ast, os, subprocess sont dans la stdlib)
 
 # Génération du dataset (partie "dataset_generation")
-openai>=1.0.0              # API OpenAI (compatible OpenRouter)
+openai>=1.0.0              # API OpenAI (compatible Gemini/Mistral/OpenRouter)
+anthropic>=0.40.0          # API Claude (teacher model prioritaire si ANTHROPIC_API_KEY est défini)
 
 # Fine-tuning (partie "training")
 transformers>=4.47.0       # Hugging Face transformers
@@ -17,6 +18,9 @@ torch>=2.3.0               # PyTorch (doit être compatible ROCm)
 python-dotenv>=1.0.0       # Variables d'environnement (.env)
 tqdm>=4.66.0               # Barres de progression
 
+# Tests
+pytest>=8.0.0
+
 # API
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
@@ -24,7 +28,7 @@ pydantic-settings>=2.6.0
 tree-sitter 
 tree-sitter-javascript 
 tree-sitter-python
-# javaparser (ce paquet n'existe pas sur PyPI sous ce nom, il fait planter pip)
+tree-sitter-java
 tree-sitter-dart
 tree-sitter-go
 tree-sitter-typescript
