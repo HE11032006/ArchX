@@ -68,66 +68,126 @@ def build_prompt_from_metrics(metrics: dict, language: str = "fr") -> str:
     return build_user_message(language, input_data)
 
 
+_MOCK_RESPONSE = {
+    "project_description": "Projet avec une dette technique modérée identifiée par l'analyse.",
+    "analysis": (
+        "Les métriques collectées indiquent des axes d'amélioration sur la structure "
+        "et la couverture de tests."
+    ),
+    "recommendation": "refactoring",
+    "phases": [
+        {"phase": 1, "action": "Réduire la dette technique", "duration_days": 10},
+        {"phase": 2, "action": "Améliorer les tests", "duration_days": 15},
+    ],
+    "risk_assessment": "Modéré",
+}
+
+# Process-wide cache for the loaded GGUF model, keyed by path — loading a
+# multi-GB GGUF file on every single request would make the container
+# unusable. The transformers path intentionally does NOT get this treatment
+# here (out of scope for this change; it already reloads per-call today).
+_gguf_model_cache: dict[str, Any] = {}
+
+
+def _extract_json_response(text: str) -> dict | None:
+    json_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not json_match:
+        return None
+    return json.loads(json_match.group()) | {"inference_mode": "fine-tuned"}
+
+
+def _call_model_transformers(prompt: str, model_path: str, language: str) -> dict | None:
+    import torch
+    from transformers import AutoModelForMultimodalLM, AutoProcessor
+
+    # Gemma 4 12B Unified is multimodal — AutoModelForMultimodalLM + AutoProcessor
+    # is the officially documented loading path (not AutoModelForCausalLM),
+    # same as training/finetune_lora_amd.ipynb. Keeping this in sync with the
+    # notebook is critical: a prior mismatch here (Gemma 2 prod vs. a locally
+    # duplicated Gemma 3 training format) caused the model to learn a prompt
+    # format it never saw again in production.
+    processor = AutoProcessor.from_pretrained(model_path)
+    model = AutoModelForMultimodalLM.from_pretrained(
+        model_path,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+    )
+
+    messages = [
+        {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT[language]}]},
+        {"role": "user", "content": [{"type": "text", "text": prompt}]},
+    ]
+    inputs = processor.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        return_tensors="pt",
+    ).to(model.device, dtype=torch.bfloat16)
+
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=1000,
+        temperature=0.3,
+        do_sample=True,
+    )
+    response = processor.tokenizer.decode(
+        outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
+    )
+    return _extract_json_response(response)
+
+
+def _get_gguf_model(model_path: str):
+    from llama_cpp import Llama
+
+    if model_path not in _gguf_model_cache:
+        logger.info("Loading GGUF model from %s (first request only, cached after)", model_path)
+        _gguf_model_cache[model_path] = Llama(
+            model_path=model_path,
+            n_ctx=4096,          # training examples run ~600-1200 tokens; headroom for prompt + max_tokens below
+            n_gpu_layers=-1,     # offload everything to GPU if llama-cpp-python was built with GPU support, else CPU
+            verbose=False,
+        )
+    return _gguf_model_cache[model_path]
+
+
+def _call_model_gguf(prompt: str, model_path: str, language: str) -> dict | None:
+    llm = _get_gguf_model(model_path)
+
+    # NOTE: content is a plain string here (not the [{'type':'text',...}] list
+    # used in the transformers path) — llama.cpp's create_chat_completion()
+    # applies the chat template embedded in the GGUF at conversion time (the
+    # same Jinja template as the HF tokenizer_config.json), and plain-string
+    # content renders identically to a single text part for that template.
+    # Still: this equivalence must be verified with the same e-commerce
+    # anti-hallucination test used for the transformers path before trusting
+    # this in production — a template mismatch here is exactly the class of
+    # bug this project has spent real effort tracking down before.
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT[language]},
+        {"role": "user", "content": prompt},
+    ]
+    response = llm.create_chat_completion(
+        messages=messages,
+        max_tokens=1000,
+        temperature=0.3,
+    )
+    content = response["choices"][0]["message"]["content"]
+    return _extract_json_response(content)
+
+
 def call_model(prompt: str, model_path: str | None, mock: bool = False, language: str = "fr") -> dict:
     if mock:
-        return {
-            "project_description": "Projet avec une dette technique modérée identifiée par l'analyse.",
-            "analysis": (
-                "Les métriques collectées indiquent des axes d'amélioration sur la structure "
-                "et la couverture de tests."
-            ),
-            "recommendation": "refactoring",
-            "phases": [
-                {"phase": 1, "action": "Réduire la dette technique", "duration_days": 10},
-                {"phase": 2, "action": "Améliorer les tests", "duration_days": 15},
-            ],
-            "risk_assessment": "Modéré",
-            "inference_mode": "mock",
-        }
+        return dict(_MOCK_RESPONSE) | {"inference_mode": "mock"}
 
     if model_path:
         try:
-            import torch
-            from transformers import AutoModelForMultimodalLM, AutoProcessor
-
-            # Gemma 4 12B Unified is multimodal — AutoModelForMultimodalLM + AutoProcessor
-            # is the officially documented loading path (not AutoModelForCausalLM),
-            # same as training/finetune_lora_amd.ipynb. Keeping this in sync with the
-            # notebook is critical: a prior mismatch here (Gemma 2 prod vs. a locally
-            # duplicated Gemma 3 training format) caused the model to learn a prompt
-            # format it never saw again in production.
-            processor = AutoProcessor.from_pretrained(model_path)
-            model = AutoModelForMultimodalLM.from_pretrained(
-                model_path,
-                torch_dtype=torch.bfloat16,
-                device_map="auto",
-            )
-
-            messages = [
-                {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT[language]}]},
-                {"role": "user", "content": [{"type": "text", "text": prompt}]},
-            ]
-            inputs = processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt",
-            ).to(model.device, dtype=torch.bfloat16)
-
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=1000,
-                temperature=0.3,
-                do_sample=True,
-            )
-            response = processor.tokenizer.decode(
-                outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
-            )
-
-            json_match = re.search(r"\{.*\}", response, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group()) | {"inference_mode": "fine-tuned"}
+            if model_path.endswith(".gguf"):
+                result = _call_model_gguf(prompt, model_path, language)
+            else:
+                result = _call_model_transformers(prompt, model_path, language)
+            if result is not None:
+                return result
         except Exception:
             logger.exception("Fine-tuned model inference failed, falling back to mock")
 

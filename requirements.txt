@@ -37,3 +37,14 @@ tree-sitter-ruby
 tree-sitter-php
 tree-sitter-c-sharp
 tree-sitter-cpp
+
+# Inférence GGUF (conteneur <10Go — voir api/services/pipeline.py::_call_model_gguf)
+# ATTENTION : `pip install llama-cpp-python` seul compile un build CPU-only.
+# Pour l'offload GPU (ARCHX_MODEL_PATH=*.gguf servi sur un GPU), il faut fixer
+# CMAKE_ARGS AVANT l'install, ex. pour CUDA :
+#   CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --no-cache-dir
+# ou pour ROCm/HIP :
+#   CMAKE_ARGS="-DGGML_HIP=on" pip install llama-cpp-python --no-cache-dir
+# Optionnel : n'installer que sur la machine de serving GGUF, pas nécessaire
+# pour le chemin transformers historique (Jupiter/HF Hub).
+llama-cpp-python>=0.3.0

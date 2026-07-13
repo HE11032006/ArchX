@@ -1,0 +1,44 @@
+# Contexte de build à exclure — la plupart de ces éléments sont soit inutiles
+# à l'exécution (notebook, dataset, tests), soit trop volumineux (les 24 Go
+# du modèle mergé non quantifié, node_modules), soit sensibles (.env).
+#
+# frontend/ N'EST PLUS exclu dans son ensemble — le Dockerfile en a besoin
+# (stage frontend-builder) depuis le passage au conteneur tout-en-un. Seuls
+# ses artefacts locaux (node_modules, build précédent) le sont.
+
+frontend/node_modules/
+frontend/.next/
+node_modules/
+
+dataset_generation/
+training/*.ipynb
+training/architect-insight-lora/
+training/architect-insight-lora-final/
+training/architect-insight-gemma4-merged/
+.ipynb_checkpoints/
+
+tests/
+demo_projects/
+
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+*.jsonl
+*.jsonl.bak
+
+# Le modèle est téléchargé depuis Hugging Face PENDANT le build (voir
+# Dockerfile, stage model-downloader) — un .gguf local ne doit jamais être
+# envoyé dans le contexte de build (inutile, et ça alourdirait l'upload).
+*.gguf
+
+.env
+.env.example
+tmp/
+feedback/
+
+*.md
+requirements.txt

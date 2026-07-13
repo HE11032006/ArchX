@@ -1,0 +1,31 @@
+# Dépendances de SERVING uniquement — délibérément séparé de requirements.txt
+# (qui tire torch/transformers/trl/peft/accelerate/datasets, ~5-7 Go à eux
+# seuls) pour que le conteneur de production reste sous la limite de 10 Go
+# du concours. Ce fichier ne couvre QUE le chemin GGUF
+# (api/services/pipeline.py::_call_model_gguf) — pas le chemin transformers
+# historique (Jupiter/HF Hub), qui reste sur requirements.txt.
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.0
+
+# ATTENTION : compile un build CPU-only par défaut. Pour l'offload GPU,
+# CMAKE_ARGS doit être fixé AVANT l'install (voir Dockerfile, ARG CMAKE_ARGS) :
+#   CUDA :   CMAKE_ARGS="-DGGML_CUDA=on"
+#   ROCm :   CMAKE_ARGS="-DGGML_HIP=on"
+llama-cpp-python>=0.3.0
+
+# Collecteur multi-langage (architect_insight/analyzers/*)
+tree-sitter
+tree-sitter-javascript
+tree-sitter-python
+tree-sitter-java
+tree-sitter-dart
+tree-sitter-go
+tree-sitter-typescript
+tree-sitter-rust
+tree-sitter-ruby
+tree-sitter-php
+tree-sitter-c-sharp
+tree-sitter-cpp
