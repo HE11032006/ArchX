@@ -25,9 +25,12 @@ ARG HF_MODEL_FILE="archx-gemma4-Q4_K_M.gguf"
 FROM python:3.11-slim AS model-downloader
 ARG HF_MODEL_REPO
 ARG HF_MODEL_FILE
-RUN pip install --no-cache-dir "huggingface_hub[cli]"
+# `huggingface_hub[cli]` used to include huggingface-cli; recent versions
+# ship the CLI in the base package as `hf` instead (huggingface-cli is now a
+# deprecated no-op shim that exits 1 — this bit us once already).
+RUN pip install --no-cache-dir huggingface_hub
 WORKDIR /model
-RUN huggingface-cli download ${HF_MODEL_REPO} ${HF_MODEL_FILE} --local-dir /model
+RUN hf download ${HF_MODEL_REPO} ${HF_MODEL_FILE} --local-dir /model
 
 # ---------- Stage 2 : dépendances Python de serving (jetable) ----------
 FROM python:3.11-slim AS python-builder
@@ -38,7 +41,11 @@ WORKDIR /app
 COPY requirements-serving.txt .
 ARG CMAKE_ARGS=""
 ENV CMAKE_ARGS=${CMAKE_ARGS}
-RUN pip install --no-cache-dir --prefix=/install -r requirements-serving.txt
+# --timeout/--retries : pip's default 15s read timeout is too short for a
+# slow/unstable connection (seen failing at ~57 kB/s against
+# files.pythonhosted.org during local testing) — this makes the build
+# tolerate a slow link instead of hard-failing mid-download.
+RUN pip install --no-cache-dir --timeout=120 --retries=10 --prefix=/install -r requirements-serving.txt
 
 # ---------- Stage 3 : build du frontend Next.js (jetable) ----------
 FROM node:20-slim AS frontend-builder
